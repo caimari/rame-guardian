@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SqliteAuthorityRepository } from "../services/agent/src/sqlite-repository.js";
-import { ProtectedHumanEditError, RevisionConflictError, SqliteRevisionWorkspace } from "../services/agent/src/revision-workspace.js";
+import { ProtectedHumanEditError, ProtectedResultStateError, RevisionConflictError, SqliteRevisionWorkspace } from "../services/agent/src/revision-workspace.js";
 
 function fixture() {
   const repository = new SqliteAuthorityRepository(":memory:");
@@ -46,7 +46,7 @@ function repairInput(ids: { proposal: string; plan: string; board: string }) {
       { resultId: ids.plan, op: "set" as const, path: ["availableHours"], value: 6, reason: "Apply the proposed availability." },
       { resultId: ids.plan, op: "set" as const, path: ["requiredHours"], value: 6, reason: "Reflect the reduced scope." },
       { resultId: ids.plan, op: "set" as const, path: ["work"], value: { audit: 3, "implementation-lite": 3 }, reason: "Preserve feasible activities." },
-      { resultId: ids.board, op: "remove" as const, path: ["tasks", "training"], reason: "Training is outside the selected scope." },
+      { resultId: ids.board, op: "remove" as const, path: ["tasks", "training"], value: null, reason: "Training is outside the selected scope." },
       { resultId: ids.board, op: "set" as const, path: ["tasks", "build", "title"], value: "Light implementation", reason: "Align the existing task without replacing its identity." },
     ],
   };
@@ -96,5 +96,12 @@ describe("selective repair workspace", () => {
     const input = repairInput({ proposal: proposal.id, plan: plan.id, board: board.id });
     input.operations.push({ resultId: proposal.id, op: "set", path: ["price"], value: 1800, reason: "Model suggested a lower price." });
     expect(() => workspace.prepareRepair(ownerId, input)).toThrow(ProtectedHumanEditError);
+  });
+
+  it("does not let a repair replace completed task state or stable identity", () => {
+    const { workspace, ownerId, proposal, plan, board } = fixture();
+    const input = repairInput({ proposal: proposal.id, plan: plan.id, board: board.id });
+    input.operations.push({ resultId: board.id, op: "remove", path: ["tasks", "audit"], value: null, reason: "Model tried to simplify the board." });
+    expect(() => workspace.prepareRepair(ownerId, input)).toThrow(ProtectedResultStateError);
   });
 });

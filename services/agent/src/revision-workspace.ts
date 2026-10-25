@@ -26,7 +26,7 @@ export type RepairOperation = {
   resultId: string;
   op: "set" | "remove";
   path: string[];
-  value?: unknown;
+  value: unknown;
   reason: string;
 };
 
@@ -34,7 +34,7 @@ export type RepairAlternative = {
   id: string;
   label: string;
   consequence: string;
-  requiresDecision: string;
+  requiresDecision: string | boolean;
   feasible: boolean;
 };
 
@@ -71,6 +71,12 @@ export class ProtectedHumanEditError extends Error {
   }
 }
 
+export class ProtectedResultStateError extends Error {
+  constructor(readonly resultId: string, readonly path: string, message: string) {
+    super(message);
+  }
+}
+
 export const createResultSchema = z.object({
   id: z.string().uuid().optional(),
   kind: z.enum(["proposal", "plan", "task_board", "reference"]),
@@ -88,29 +94,33 @@ export const humanEditSchema = z.object({
   value: z.unknown(),
 });
 
-const operationSchema = z.object({
+const operationFields = {
   resultId: z.string().uuid(),
-  op: z.enum(["set", "remove"]),
   path: z.array(z.string().min(1).max(120)).min(1).max(20),
-  value: z.unknown().optional(),
   reason: z.string().min(1).max(500),
-}).refine((operation) => operation.op === "remove" || "value" in operation, {
-  message: "set operations require a value",
-  path: ["value"],
+};
+
+const operationSchema = z.object({
+  ...operationFields,
+  op: z.enum(["set", "remove"]),
+  value: z.json(),
 });
 
-export const prepareRepairSchema = z.object({
-  changeRequest: z.string().min(3).max(2_000),
+export const repairPlanSchema = z.object({
   alternatives: z.array(z.object({
     id: z.string().min(1).max(80),
     label: z.string().min(1).max(180),
     consequence: z.string().min(1).max(1_000),
-    requiresDecision: z.string().min(1).max(500),
+    requiresDecision: z.union([z.string().min(1).max(500), z.boolean()]),
     feasible: z.boolean(),
   })).min(1).max(10),
   selectedAlternativeId: z.string().min(1).max(80),
   affectedResultIds: z.array(z.string().uuid()).min(1).max(50),
   operations: z.array(operationSchema).min(1).max(200),
+});
+
+export const prepareRepairSchema = repairPlanSchema.extend({
+  changeRequest: z.string().min(3).max(2_000),
 });
 
 export type PrepareRepairInput = z.infer<typeof prepareRepairSchema>;
@@ -202,6 +212,7 @@ export class SqliteRevisionWorkspace {
       const pointer = toPointer(operation.path);
       const protectedPath = result.humanEditedPaths.find((candidate) => pathsOverlap(candidate, pointer));
       if (protectedPath) throw new ProtectedHumanEditError(result.id, protectedPath);
+      assertOperationalStateIsPreserved(result, operation, pointer);
       changesByResult.set(result.id, (changesByResult.get(result.id) ?? 0) + 1);
     }
 
@@ -318,4 +329,27 @@ function setAtPath(root: Record<string, unknown>, path: string[], value: unknown
 function removeAtPath(root: Record<string, unknown>, path: string[]) {
   const { parent, key } = parentAtPath(root, path);
   delete parent[key];
+}
+
+function assertOperationalStateIsPreserved(result: WorkResult, operation: RepairOperation, pointer: string) {
+  if (result.kind !== "task_board" || operation.path[0] !== "tasks") return;
+  if (operation.path.length < 2) {
+    throw new ProtectedResultStateError(result.id, pointer, "A repair must address tasks by stable id rather than replace the whole task collection.");
+  }
+  const taskId = operation.path[1]!;
+  const tasks = result.content.tasks;
+  const task = tasks && typeof tasks === "object" && !Array.isArray(tasks)
+    ? (tasks as Record<string, unknown>)[taskId]
+    : undefined;
+  const existing = task && typeof task === "object" && !Array.isArray(task) ? task as Record<string, unknown> : null;
+  if (!existing) return;
+  if (operation.path.length === 2 && existing.status === "done") {
+    throw new ProtectedResultStateError(result.id, pointer, "A completed task cannot be removed or replaced by a repair.");
+  }
+  if (operation.path[2] === "id") {
+    throw new ProtectedResultStateError(result.id, pointer, "A repair cannot change a task's stable identity.");
+  }
+  if (operation.path[2] === "status" && existing.status === "done" && operation.value !== "done") {
+    throw new ProtectedResultStateError(result.id, pointer, "A repair cannot reopen a completed task.");
+  }
 }

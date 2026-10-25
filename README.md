@@ -52,6 +52,7 @@ The server listens on `127.0.0.1:8787` by default. The current identity header i
 - `POST /v1/proposals` creates an untrusted decision proposal.
 - `POST /v1/proposals/:id/authorize` performs the human authorization transition.
 - `POST /v1/agent/inspect-document` asks Nemotron to extract plans while treating document contents as untrusted.
+- `POST /v1/agent/plan-repair` asks Nemotron for alternatives and field-level operations over the complete result snapshot; it does not mutate state.
 - `POST /v1/actions/execute` checks current decision versions and applies a task/calendar effect in one database transaction.
 - `POST /v1/results/:id/human-edit` records a user edit without losing field provenance.
 - `POST /v1/repairs/prepare` creates a non-mutating consequence and repair preview.
@@ -59,6 +60,7 @@ The server listens on `127.0.0.1:8787` by default. The current identity header i
 - `GET /v1/audit` exposes the evidence trail.
 
 See [docs/VERIFICATION.md](docs/VERIFICATION.md) for the gates run against the implementation and the live model.
+See [docs/EVALUATION.md](docs/EVALUATION.md) for the controlled same-model comparison protocol.
 
 ## License
 

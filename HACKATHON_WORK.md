@@ -13,4 +13,5 @@ New work planned and implemented for the Nebius x NVIDIA Global AI Hackathon 202
 - Atomic conflict detection when a result changes after a repair preview.
 - Adversarial document and stale-session demonstrations.
 - Reproducible deterministic and model-backed evaluations.
+- Same-model, same-context comparison against a reference executor without RAME version guards.
 - English-first bilingual web experience and deployment.

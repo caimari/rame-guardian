@@ -57,7 +57,28 @@ The fixture contains three related results (client proposal, delivery plan, and 
 - A model-suggested overwrite of a human-edited price is rejected before a draft is created.
 - If any affected result changes after preview, application fails as stale, records the conflict, and causes no partial repair.
 
-This gate validates the deterministic continuity mechanism. Live Nemotron generation of alternatives and repair operations, the product UI, and comparative evaluation are separate remaining gates.
+This gate validates the deterministic continuity mechanism. Live Nemotron planning and an isolated comparison are covered below; the product UI and broader repeated evaluation remain separate gates.
+
+## Gate 6 — live Nemotron selective repair
+
+Status: PASS on 2026-10-25
+
+- Runtime model: `nvidia/nemotron-3-super-120b-a12b` through Nebius Token Factory.
+- The complete proposal, delivery plan, task board, independent comparison, dependency metadata, and human-edit markers were supplied in one snapshot.
+- Nemotron returned two alternatives and four field-level operations.
+- The provisional repair affected only the plan and task board; the proposal and independent comparison remained unchanged.
+- The applied result preserved both human edits, the completed task identity and status, and the independent result.
+- Usage for the passing run was 968 prompt tokens and 586 completion tokens (1,554 total).
+
+Earlier development calls exposed two output-contract issues: unconstrained JSON used inconsistent alternative fields, and the provider returned HTTP 500 for the attempted conditional JSON Schema. The production contract therefore uses JSON-object mode followed by strict local Zod validation. Invalid model output never reaches the repair engine.
+
+## Gate 7 — same-model, same-context execution comparison
+
+Status: PASS on 2026-10-25
+
+The reference executor and RAME receive the same result snapshot and exact same field-level model operations. A concurrent human edit is then introduced before application. The reference executor overwrites it with the older operation; RAME detects the base-version change, blocks the entire stale repair, and preserves the newer edit.
+
+See [EVALUATION.md](EVALUATION.md) for controls, limitations, and planned metrics.
 
 ## Automated suite
 
@@ -67,4 +88,4 @@ Run:
 npm run check
 ```
 
-Current result: 11 tests pass across authority, model-boundary, transactional-action, and selective-repair suites, with TypeScript strict checking enabled.
+Current result: 14 tests pass across authority, model-boundary, transactional-action, selective-repair, and comparative-evaluation suites, with TypeScript strict checking enabled.

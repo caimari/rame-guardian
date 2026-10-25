@@ -7,7 +7,7 @@ import { loadReceiptSigner } from "./keys.js";
 import { SqliteAuthorityRepository } from "./sqlite-repository.js";
 import { NebiusClient } from "./nebius-client.js";
 import { ActionConflictError, protectedActionInputSchema, SqliteActionExecutor } from "./action-executor.js";
-import { createResultSchema, humanEditSchema, prepareRepairSchema, ProtectedHumanEditError, RevisionConflictError, SqliteRevisionWorkspace } from "./revision-workspace.js";
+import { createResultSchema, humanEditSchema, prepareRepairSchema, ProtectedHumanEditError, ProtectedResultStateError, RevisionConflictError, SqliteRevisionWorkspace } from "./revision-workspace.js";
 
 const dataDirectory = process.env.RAME_DATA_DIR ?? join(process.cwd(), "data");
 mkdirSync(dataDirectory, { recursive: true, mode: 0o700 });
@@ -109,6 +109,7 @@ app.post("/v1/repairs/prepare", async (request, reply) => {
     return reply.code(201).send({ repair: revisions.prepareRepair(userId(request), parsed.data) });
   } catch (error) {
     if (error instanceof ProtectedHumanEditError) return reply.code(409).send({ error: "human_edit_protected", message: error.message, resultId: error.resultId, path: error.path });
+    if (error instanceof ProtectedResultStateError) return reply.code(409).send({ error: "operational_state_protected", message: error.message, resultId: error.resultId, path: error.path });
     throw error;
   }
 });
@@ -116,6 +117,23 @@ app.post("/v1/repairs/prepare", async (request, reply) => {
 app.get<{ Params: { id: string } }>("/v1/repairs/:id", async (request, reply) => {
   const repair = revisions.getRepair(userId(request), request.params.id);
   return repair ? { repair } : reply.code(404).send({ error: "repair_not_found" });
+});
+
+app.post("/v1/agent/plan-repair", async (request, reply) => {
+  if (!nebius) return reply.code(503).send({ error: "nebius_not_configured" });
+  const schema = z.object({ changeRequest: z.string().min(3).max(2_000) });
+  const parsed = schema.safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: "invalid_change_request", details: parsed.error.issues });
+  const results = revisions.listResults(userId(request));
+  if (results.length === 0) return reply.code(409).send({ error: "no_results", message: "Create work results before planning a repair." });
+  const proposed = await nebius.planRepair({ changeRequest: parsed.data.changeRequest, results });
+  repository.audit(userId(request), "repair.model_planned", crypto.randomUUID(), {
+    model: proposed.model,
+    usage: proposed.usage,
+    affectedResultIds: proposed.plan.affectedResultIds,
+    operations: proposed.plan.operations.length,
+  });
+  return proposed;
 });
 
 app.post<{ Params: { id: string } }>("/v1/repairs/:id/apply", async (request, reply) => {
