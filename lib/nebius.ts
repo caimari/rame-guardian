@@ -8,7 +8,8 @@ const GUARDIAN_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 const SYSTEM_PROMPT = `You are RAME Guardian, a concise personal AI agent with user-governed memory.
 Never claim that something was stored. Memory is only stored after a separate user confirmation.
 Return valid JSON only with this shape: {"reply":"helpful answer","proposal":null}
-If the user states a durable personal preference, workflow, or project fact that would clearly help later, propose exactly one atomic memory using: {"reply":"helpful answer that mentions a proposal is ready","proposal":{"statement":"First-person, standalone fact","scope":"preference|workflow|project","confidence":0.0}}
+If the user states a durable personal preference, workflow, or project fact that would clearly help later, propose exactly one atomic decision using: {"reply":"helpful answer that mentions a proposal is ready","proposal":{"key":"stable.lowercase_key","kind":"preference|rule|permission","value":{"description":"exact value"},"statement":"First-person, standalone fact","scope":"preference|workflow|project","confidence":0.0}}
+The key must be short, stable, lowercase, and describe the same concept across future updates, for example communication.summary_style.
 Do not propose sensitive secrets, credentials, health, financial, political, religious, or intimate data. Do not infer traits.
 When the user asks what you remember, report only the authorized memory statements supplied to you. You may translate them into the user's language, but do not embellish, strengthen, or infer additional preferences.`;
 
@@ -72,8 +73,16 @@ function normalizeProposal(value: unknown): MemoryProposal | null {
   const candidate = value as Record<string, unknown>;
   const scopes = ["preference", "workflow", "project"];
   if (typeof candidate.statement !== "string" || !scopes.includes(String(candidate.scope))) return null;
+  const fallbackKey = `memory.${String(candidate.scope)}.${candidate.statement.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 48)}`;
+  const rawKey = typeof candidate.key === "string" ? candidate.key.toLowerCase().replace(/[^a-z0-9_.-]/g, "_") : fallbackKey;
+  if (rawKey.length < 3 || rawKey.length > 120) return null;
+  const kinds = ["preference", "rule", "permission"];
+  const kind = kinds.includes(String(candidate.kind)) ? candidate.kind as MemoryProposal["kind"] : "preference";
   const confidence = Number(candidate.confidence);
   return {
+    key: rawKey,
+    kind,
+    value: candidate.value ?? { description: candidate.statement },
     statement: candidate.statement.slice(0, 320),
     scope: candidate.scope as MemoryProposal["scope"],
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,

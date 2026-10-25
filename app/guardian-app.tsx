@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, Check, ChevronRight, CircleDot, Copy, FileSearch, GitFork, KeyRound, Languages, Loader2, LockKeyhole, Play, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import ConversationPanel from "./conversation-panel";
 
 type Decision = { id: string; key: string; value: { time?: string }; statement: string; version: number; authorizedAt: number };
 type Event = { id: string; action: string; subject_id: string; detail: Record<string, unknown>; created_at: number };
@@ -24,6 +25,7 @@ const copy = {
     unsafe: "Try hostile 08:00 action", safe: "Execute safe 10:30 action", stale: "Replay old plan after update", actions: "Protected execution",
     audit: "Evidence trail", receipts: "Signed receipts", calendar: "Committed effects", empty: "Run the flow to generate evidence.",
     verified: "Ed25519 verified", model: "NVIDIA Nemotron on Nebius", loading: "Working…", copied: "Copied", copy: "Copy",
+    conversation: "Conversation", conversationHint: "Chat, plan, and propose memory", lab: "Guardian Lab", labHint: "Test authority under attack",
   },
   es: {
     private: "Espacio privado en vivo", strap: "IA PERSONAL · AUTORIDAD ANTES QUE AUTONOMÍA", title: "Agentes útiles. Decisiones tuyas.",
@@ -35,11 +37,13 @@ const copy = {
     unsafe: "Probar acción hostil a las 08:00", safe: "Ejecutar acción segura a las 10:30", stale: "Repetir plan antiguo tras actualizar", actions: "Ejecución protegida",
     audit: "Rastro de evidencias", receipts: "Recibos firmados", calendar: "Efectos confirmados", empty: "Ejecuta el flujo para generar evidencias.",
     verified: "Ed25519 verificado", model: "NVIDIA Nemotron en Nebius", loading: "Procesando…", copied: "Copiado", copy: "Copiar",
+    conversation: "Conversación", conversationHint: "Conversa, planifica y propón memoria", lab: "Guardian Lab", labHint: "Prueba la autoridad bajo ataque",
   },
 };
 
 export default function GuardianApp({ displayName }: { displayName: string }) {
   const [language, setLanguage] = useState<"en" | "es">("en");
+  const [activeTab, setActiveTab] = useState<"conversation" | "lab">("conversation");
   const [state, setState] = useState<State>({ decisions: [], receipts: [], events: [], calendarBlocks: [] });
   const [document, setDocument] = useState(ATTACK_DOCUMENT);
   const [inspection, setInspection] = useState<Inspection | null>(null);
@@ -124,12 +128,17 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
       <div className="guardian-model"><Sparkles size={16} /><span><strong>Nemotron 3 Super</strong><small>{t.model}</small></span></div>
     </section>
 
-    <div className="guardian-flow" aria-label="Authority flow">
+    <nav className="workspace-tabs" aria-label="Workspace views">
+      <button className={activeTab === "conversation" ? "active" : ""} onClick={() => setActiveTab("conversation")}><span><strong>{t.conversation}</strong><small>{t.conversationHint}</small></span></button>
+      <button className={activeTab === "lab" ? "active" : ""} onClick={() => setActiveTab("lab")}><span><strong>{t.lab}</strong><small>{t.labHint}</small></span></button>
+    </nav>
+
+    {activeTab === "lab" && <div className="guardian-flow" aria-label="Authority flow">
       {[t.observe, t.propose, t.authorize, t.execute, t.evidence].map((label, index) => <div key={label}><span>0{index + 1}</span><strong>{label}</strong>{index < 4 && <ChevronRight size={15} />}</div>)}
-    </div>
+    </div>}
 
     <div className="guardian-grid">
-      <section className="guardian-main">
+      {activeTab === "conversation" ? <ConversationPanel language={language} displayName={displayName} authorizedStatements={state.decisions.map((item) => item.statement)} onAuthorized={async (verified) => { setReceiptVerified(verified); await loadState(); }} /> : <section className="guardian-main">
         <article className="guardian-card policy-card">
           <header><div className="guardian-icon"><LockKeyhole size={18} /></div><div><p>01 · AUTHORITY</p><h2>{t.policy}</h2></div><span className={`guardian-status ${decision ? "ok" : ""}`}>{decision ? `v${decision.version} · ${decision.value.time}` : "NOT SET"}</span></header>
           <div className="policy-body">
@@ -161,7 +170,7 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
           {result && <div className={`action-result ${result.decision.allowed ? "allowed" : "blocked"}`}><span>{result.decision.allowed ? <Check size={18} /> : <LockKeyhole size={18} />}</span><div><strong>{result.decision.allowed ? "ACTION COMMITTED" : `BLOCKED · ${result.decision.code}`}</strong><p>{result.decision.reason}</p></div><CopyButton value={JSON.stringify(result, null, 2)} id="result" copied={copied} onCopy={copyText} labels={t} /></div>}
         </article>}
         {error && <div className="guardian-error"><AlertTriangle size={16} />{error}</div>}
-      </section>
+      </section>}
 
       <aside className="guardian-rail">
         <section><header><ShieldCheck size={17} /><div><h3>{t.receipts}</h3><p>{state.receipts.length} cryptographic records</p></div></header>{state.receipts.length ? state.receipts.slice(0, 4).map((receipt) => <div className="receipt-item" key={receipt.id}><span><Check size={12} /> VERIFIED</span><strong>{String(receipt.payload.key)} · v{String(receipt.payload.version)}</strong><code>{receipt.signature.slice(0, 24)}…</code><CopyButton value={JSON.stringify(receipt, null, 2)} id={receipt.id} copied={copied} onCopy={copyText} labels={t} /></div>) : <Empty text={t.empty} />}</section>

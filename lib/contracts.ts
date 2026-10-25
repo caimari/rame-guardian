@@ -1,4 +1,7 @@
 export type MemoryProposal = {
+  key: string;
+  kind: "preference" | "rule" | "permission";
+  value: unknown;
   statement: string;
   scope: "preference" | "workflow" | "project";
   confidence: number;
