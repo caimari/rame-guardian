@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, Check, ChevronRight, CircleDot, Copy, FileSearch, GitFork, KeyRound, Languages, Loader2, LockKeyhole, Play, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import ConversationPanel from "./conversation-panel";
+import RecoveryPanel from "./recovery-panel";
 
 type Decision = { id: string; key: string; value: { time?: string }; statement: string; version: number; authorizedAt: number };
 type Event = { id: string; action: string; subject_id: string; detail: Record<string, unknown>; created_at: number };
@@ -25,7 +26,7 @@ const copy = {
     unsafe: "Try hostile 08:00 action", safe: "Execute safe 10:30 action", stale: "Replay old plan after update", actions: "Protected execution",
     audit: "Evidence trail", receipts: "Signed receipts", calendar: "Committed effects", empty: "Run the flow to generate evidence.",
     verified: "Ed25519 verified", model: "NVIDIA Nemotron on Nebius", loading: "Working…", copied: "Copied", copy: "Copy",
-    conversation: "Conversation", conversationHint: "Chat, plan, and propose memory", lab: "Guardian Lab", labHint: "Test authority under attack",
+    conversation: "Conversation", conversationHint: "Chat, plan, and propose memory", lab: "Guardian Lab", labHint: "Test authority under attack", recovery: "Recovery Studio", recoveryHint: "Repair stale work without losing intent",
   },
   es: {
     private: "Espacio privado en vivo", strap: "IA PERSONAL · AUTORIDAD ANTES QUE AUTONOMÍA", title: "Agentes útiles. Decisiones tuyas.",
@@ -37,13 +38,13 @@ const copy = {
     unsafe: "Probar acción hostil a las 08:00", safe: "Ejecutar acción segura a las 10:30", stale: "Repetir plan antiguo tras actualizar", actions: "Ejecución protegida",
     audit: "Rastro de evidencias", receipts: "Recibos firmados", calendar: "Efectos confirmados", empty: "Ejecuta el flujo para generar evidencias.",
     verified: "Ed25519 verificado", model: "NVIDIA Nemotron en Nebius", loading: "Procesando…", copied: "Copiado", copy: "Copiar",
-    conversation: "Conversación", conversationHint: "Conversa, planifica y propón memoria", lab: "Guardian Lab", labHint: "Prueba la autoridad bajo ataque",
+    conversation: "Conversación", conversationHint: "Conversa, planifica y propón memoria", lab: "Guardian Lab", labHint: "Prueba la autoridad bajo ataque", recovery: "Estudio de recuperación", recoveryHint: "Repara trabajo obsoleto sin perder intención",
   },
 };
 
 export default function GuardianApp({ displayName }: { displayName: string }) {
   const [language, setLanguage] = useState<"en" | "es">("en");
-  const [activeTab, setActiveTab] = useState<"conversation" | "lab">("conversation");
+  const [activeTab, setActiveTab] = useState<"conversation" | "lab" | "recovery">("conversation");
   const [state, setState] = useState<State>({ decisions: [], receipts: [], events: [], calendarBlocks: [] });
   const [document, setDocument] = useState(ATTACK_DOCUMENT);
   const [inspection, setInspection] = useState<Inspection | null>(null);
@@ -131,13 +132,15 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
     <nav className="workspace-tabs" aria-label="Workspace views">
       <button className={activeTab === "conversation" ? "active" : ""} onClick={() => setActiveTab("conversation")}><span><strong>{t.conversation}</strong><small>{t.conversationHint}</small></span></button>
       <button className={activeTab === "lab" ? "active" : ""} onClick={() => setActiveTab("lab")}><span><strong>{t.lab}</strong><small>{t.labHint}</small></span></button>
+      <button className={activeTab === "recovery" ? "active" : ""} onClick={() => setActiveTab("recovery")}><span><strong>{t.recovery}</strong><small>{t.recoveryHint}</small></span></button>
     </nav>
 
     {activeTab === "lab" && <div className="guardian-flow" aria-label="Authority flow">
       {[t.observe, t.propose, t.authorize, t.execute, t.evidence].map((label, index) => <div key={label}><span>0{index + 1}</span><strong>{label}</strong>{index < 4 && <ChevronRight size={15} />}</div>)}
     </div>}
 
-    <div className="guardian-grid">
+    {activeTab === "recovery" && <RecoveryPanel language={language} onAuthorityChanged={loadState} />}
+    <div className={activeTab === "recovery" ? "guardian-grid workspace-hidden" : "guardian-grid"}>
       <div className={activeTab === "conversation" ? "workspace-view" : "workspace-view workspace-hidden"}><ConversationPanel language={language} displayName={displayName} authorizedStatements={state.decisions.map((item) => item.statement)} onAuthorized={async (verified) => { setReceiptVerified(verified); await loadState(); }} /></div>
       <section className={activeTab === "lab" ? "guardian-main workspace-view" : "guardian-main workspace-view workspace-hidden"}>
         <article className="guardian-card policy-card">

@@ -4,9 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RAME Guardian — Memory you control",
   description: "A personal AI agent with explicit, versioned, user-authorized memory.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

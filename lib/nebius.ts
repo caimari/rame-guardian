@@ -68,6 +68,36 @@ export async function inspectWithNebius(input: { title: string; content: string;
   return { inspection: parsed, model: GUARDIAN_MODEL, usage: raw.usage ?? null };
 }
 
+export type RepairRecommendation = {
+  summary: string;
+  selectedAlternative: string;
+  rationale: string;
+  preserved: string[];
+  risks: string[];
+};
+
+export async function repairWithNemotron(input: { targetHours: number; authority: unknown; results: unknown[]; provisional: boolean }) {
+  const apiKey = env.NEBIUS_API_KEY;
+  if (!apiKey) throw new Error("Nebius is not configured on this deployment.");
+  const system = `You are the selective-repair planner in RAME Guardian. You never mutate records or grant authority. Given versioned work results and an authoritative hours constraint, recommend the smallest coherent repair. Preserve human-edited fields exactly. Preserve completed tasks and unrelated results. Return JSON only with exactly: summary (string), selectedAlternative (string), rationale (string), preserved (string array), risks (string array). Do not invent authorization.`;
+  const response = await fetch(`${BASE_URL}/chat/completions`, {
+    method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: GUARDIAN_MODEL, messages: [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify({ objective: "Keep the delivery viable while adapting only authority-dependent work.", ...input }) },
+    ], temperature: 0, max_tokens: 700, response_format: { type: "json_object" }, chat_template_kwargs: { enable_thinking: false } }),
+  });
+  if (!response.ok) throw new Error(`Nebius returned HTTP ${response.status}.`);
+  const raw = await response.json() as { usage?: unknown; choices?: Array<{ message?: { content?: string } }> };
+  const content = raw.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Nemotron returned an empty repair recommendation.");
+  const parsed = JSON.parse(content) as RepairRecommendation;
+  if (!parsed || typeof parsed.summary !== "string" || typeof parsed.selectedAlternative !== "string" || typeof parsed.rationale !== "string" || !Array.isArray(parsed.preserved) || !Array.isArray(parsed.risks)) {
+    throw new Error("Nemotron returned an invalid repair recommendation.");
+  }
+  return { recommendation: parsed, model: GUARDIAN_MODEL, usage: raw.usage ?? null };
+}
+
 function normalizeProposal(value: unknown): MemoryProposal | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
