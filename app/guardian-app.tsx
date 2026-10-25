@@ -1,14 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BrainCircuit, Check, ChevronRight, CircleDot, GitFork, Globe2, History, KeyRound, Loader2, LockKeyhole, MessageSquareText, Plus, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { BrainCircuit, Check, ChevronRight, CircleDot, Copy, GitFork, Globe2, History, KeyRound, Loader2, LockKeyhole, MessageSquareText, Plus, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import type { ChatResponse, MemoryProposal } from "../lib/contracts";
 
 type Message = { role: "user" | "assistant"; content: string };
 const EXAMPLES = [
   "Remember that I prefer concise technical summaries.",
   "Help me plan a safe production deployment.",
-  "What do you remember about how I work?",
+  "¿Qué recuerdas sobre cómo prefiero recibir los resúmenes técnicos?",
 ];
 
 export default function GuardianApp({ displayName }: { displayName: string }) {
@@ -18,6 +18,7 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
   const [authorized, setAuthorized] = useState<MemoryProposal[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const firstName = useMemo(() => displayName.split(/[ @]/)[0] || "there", [displayName]);
 
   useEffect(() => {
@@ -44,6 +45,23 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
     } catch (error) {
       setMessages((current) => [...current, { role: "assistant", content: error instanceof Error ? `I couldn’t reach the model: ${error.message}` : "I couldn’t reach the model. Please try again." }]);
     } finally { setLoading(false); }
+  }
+
+  async function copyText(text: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    setCopiedKey(key);
+    window.setTimeout(() => setCopiedKey((current) => current === key ? null : current), 1600);
   }
 
   async function authorizeProposal() {
@@ -79,17 +97,17 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
           <div className="principle-strip"><div><span>01</span><strong>Observed</strong><small>Context is detected</small></div><ChevronRight size={16} /><div><span>02</span><strong>Proposed</strong><small>You see the exact claim</small></div><ChevronRight size={16} /><div><span>03</span><strong>Authorized</strong><small>A signed version is kept</small></div></div>
           <div className="messages" aria-live="polite">
             <div className="day-label">Today</div>
-            {messages.map((message, index) => <div className={`message ${message.role}`} key={`${message.role}-${index}`}><span className="message-avatar">{message.role === "assistant" ? <ShieldCheck size={17} /> : firstName.slice(0, 1).toUpperCase()}</span><div><p className="message-name">{message.role === "assistant" ? "Guardian" : firstName}</p><div className="bubble">{message.content}</div></div></div>)}
+            {messages.map((message, index) => { const key = `message-${index}`; return <div className={`message ${message.role}`} key={`${message.role}-${index}`}><span className="message-avatar">{message.role === "assistant" ? <ShieldCheck size={17} /> : firstName.slice(0, 1).toUpperCase()}</span><div><p className="message-name">{message.role === "assistant" ? "Guardian" : firstName}</p><div className="bubble"><span>{message.content}</span><button className="copy-button" type="button" onClick={() => void copyText(message.content, key)} title="Copy text" aria-label="Copy message">{copiedKey === key ? <Check size={14} /> : <Copy size={14} />}<em>{copiedKey === key ? "Copied" : "Copy"}</em></button></div></div></div>; })}
             {loading && <div className="thinking"><Loader2 size={16} className="spin" /> Nemotron is reasoning…</div>}
             {pending && <article className="proposal-card"><div className="proposal-head"><div><CircleDot size={18} /><span><strong>Memory proposal</strong><small>Nothing has been stored yet</small></span></div><span className="proposal-state">AWAITING YOU</span></div><blockquote>{pending.statement}</blockquote><div className="proposal-meta"><span>Scope <strong>{pending.scope}</strong></span><span>Confidence <strong>{Math.round(pending.confidence * 100)}%</strong></span><span>Source <strong>This conversation</strong></span></div><div className="proposal-actions"><button className="reject" onClick={() => { setPending(null); setNotice("Proposal rejected. Nothing was stored."); }}><X size={16} /> Reject</button><button className="approve" onClick={() => void authorizeProposal()}><Check size={16} /> Authorize memory</button></div></article>}
             {notice && <div className="notice"><ShieldCheck size={16} /> {notice}</div>}
           </div>
-          <div className="composer-wrap"><div className="suggestions">{EXAMPLES.map((prompt) => <button key={prompt} onClick={() => setInput(prompt)}>{prompt}</button>)}</div><form className="composer" onSubmit={sendMessage}><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="Talk to Guardian…" rows={1} /><button type="submit" disabled={!input.trim() || loading}><Send size={18} /></button></form><p>Guardian may make mistakes. You decide what becomes memory.</p></div>
+          <div className="composer-wrap"><div className="suggestions">{EXAMPLES.map((prompt, index) => { const key = `prompt-${index}`; return <span className="suggestion" key={prompt}><button onClick={() => setInput(prompt)}>{prompt}</button><button className="suggestion-copy" onClick={() => void copyText(prompt, key)} title="Copy prompt" aria-label={`Copy prompt: ${prompt}`}>{copiedKey === key ? <Check size={11} /> : <Copy size={11} />}</button></span>; })}</div><form className="composer" onSubmit={sendMessage}><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="Talk to Guardian…" rows={1} /><button type="submit" disabled={!input.trim() || loading}><Send size={18} /></button></form><p>Guardian may make mistakes. You decide what becomes memory.</p></div>
         </section>
 
         <aside className="memory-panel">
           <div className="panel-title"><div><BrainCircuit size={18} /><span><strong>Authorized memory</strong><small>{authorized.length} active memories</small></span></div><button>•••</button></div>
-          {authorized.length === 0 ? <div className="empty-memory"><span><ShieldCheck size={25} /></span><strong>No silent memory</strong><p>Approved facts will appear here with their origin and version history.</p></div> : authorized.map((item, index) => <article className="memory-item" key={`${item.statement}-${index}`}><div><span className="verified"><Check size={12} /> VERIFIED</span><span className="version">v{index + 1}.0</span></div><p>{item.statement}</p><small>Authorized just now · This conversation</small></article>)}
+          {authorized.length === 0 ? <div className="empty-memory"><span><ShieldCheck size={25} /></span><strong>No silent memory</strong><p>Approved facts will appear here with their origin and version history.</p></div> : authorized.map((item, index) => { const key = `memory-${index}`; return <article className="memory-item" key={`${item.statement}-${index}`}><div><span className="verified"><Check size={12} /> VERIFIED</span><span className="memory-tools"><span className="version">v{index + 1}.0</span><button className="copy-button compact" type="button" onClick={() => void copyText(item.statement, key)} title="Copy memory" aria-label="Copy memory">{copiedKey === key ? <Check size={12} /> : <Copy size={12} />}</button></span></div><p>{item.statement}</p><small>{copiedKey === key ? "Copied to clipboard" : "Authorized · This conversation"}</small></article>; })}
           <div className="audit-preview"><div className="panel-title"><div><History size={18} /><span><strong>Recent activity</strong><small>Human-readable audit trail</small></span></div></div><ol><li><span className="event-dot green" /><div><strong>Workspace opened</strong><small>Private session · just now</small></div></li><li><span className="event-dot" /><div><strong>Memory policy loaded</strong><small>Explicit authorization required</small></div></li></ol></div>
           <a className="ecosystem-link" href="https://ramesystem.com/" target="_blank" rel="noreferrer"><Globe2 size={16} /><span><strong>Explore the RAME ecosystem</strong><small>Pre-existing work · ramesystem.com</small></span><ChevronRight size={16} /></a>
         </aside>
