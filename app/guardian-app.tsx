@@ -138,7 +138,8 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
     </div>}
 
     <div className="guardian-grid">
-      {activeTab === "conversation" ? <ConversationPanel language={language} displayName={displayName} authorizedStatements={state.decisions.map((item) => item.statement)} onAuthorized={async (verified) => { setReceiptVerified(verified); await loadState(); }} /> : <section className="guardian-main">
+      <div className={activeTab === "conversation" ? "workspace-view" : "workspace-view workspace-hidden"}><ConversationPanel language={language} displayName={displayName} authorizedStatements={state.decisions.map((item) => item.statement)} onAuthorized={async (verified) => { setReceiptVerified(verified); await loadState(); }} /></div>
+      <section className={activeTab === "lab" ? "guardian-main workspace-view" : "guardian-main workspace-view workspace-hidden"}>
         <article className="guardian-card policy-card">
           <header><div className="guardian-icon"><LockKeyhole size={18} /></div><div><p>01 · AUTHORITY</p><h2>{t.policy}</h2></div><span className={`guardian-status ${decision ? "ok" : ""}`}>{decision ? `v${decision.version} · ${decision.value.time}` : "NOT SET"}</span></header>
           <div className="policy-body">
@@ -170,7 +171,7 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
           {result && <div className={`action-result ${result.decision.allowed ? "allowed" : "blocked"}`}><span>{result.decision.allowed ? <Check size={18} /> : <LockKeyhole size={18} />}</span><div><strong>{result.decision.allowed ? "ACTION COMMITTED" : `BLOCKED · ${result.decision.code}`}</strong><p>{result.decision.reason}</p></div><CopyButton value={JSON.stringify(result, null, 2)} id="result" copied={copied} onCopy={copyText} labels={t} /></div>}
         </article>}
         {error && <div className="guardian-error"><AlertTriangle size={16} />{error}</div>}
-      </section>}
+      </section>
 
       <aside className="guardian-rail">
         <section><header><ShieldCheck size={17} /><div><h3>{t.receipts}</h3><p>{state.receipts.length} cryptographic records</p></div></header>{state.receipts.length ? state.receipts.slice(0, 4).map((receipt) => <div className="receipt-item" key={receipt.id}><span><Check size={12} /> VERIFIED</span><strong>{String(receipt.payload.key)} · v{String(receipt.payload.version)}</strong><code>{receipt.signature.slice(0, 24)}…</code><CopyButton value={JSON.stringify(receipt, null, 2)} id={receipt.id} copied={copied} onCopy={copyText} labels={t} /></div>) : <Empty text={t.empty} />}</section>
