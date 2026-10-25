@@ -1,0 +1,21 @@
+{
+  "name": "rame-guardian",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "services/*", "apps/*"],
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "4.0.17"
+  }
+}
