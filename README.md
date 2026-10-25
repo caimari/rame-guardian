@@ -12,9 +12,17 @@ Untrusted observation -> model proposal -> user authorization -> versioned decis
 Action request + expected versions -> deterministic policy check -> execute or block
 ```
 
-## Status
+## Implemented now
 
-The first implementation gate covers human-only authorization, Ed25519 receipts, constraint enforcement, and stale-version rejection. The agent server, document workflow, web client, OpenShell integration, and evaluation suite are under active development.
+- Human-only authorization with versioned durable decisions.
+- Atomic SQLite commits for proposals, decisions, receipts, and audit events.
+- Ed25519 server-signed receipts with a public verification key.
+- Nemotron document inspection through Nebius Token Factory with an explicit untrusted-data boundary.
+- Transactional, idempotent task and calendar execution.
+- Constraint enforcement and stale-session rejection at execution time.
+- Persistent task, calendar, and human-readable audit outputs.
+
+The web client, production authentication, OpenShell deployment, and broader evaluation suite remain under active development.
 
 ## Development
 
@@ -24,6 +32,25 @@ Requires Node.js 22.13 or newer.
 npm install
 npm run check
 ```
+
+To run the API, place the Nebius key in an environment variable without committing it:
+
+```bash
+export NEBIUS_API_KEY='...'
+npm run start --workspace @rame/agent-server
+```
+
+The server listens on `127.0.0.1:8787` by default. The current identity header is intentionally a local-demo stub and must be replaced before public deployment.
+
+## Core API
+
+- `POST /v1/proposals` creates an untrusted decision proposal.
+- `POST /v1/proposals/:id/authorize` performs the human authorization transition.
+- `POST /v1/agent/inspect-document` asks Nemotron to extract plans while treating document contents as untrusted.
+- `POST /v1/actions/execute` checks current decision versions and applies a task/calendar effect in one database transaction.
+- `GET /v1/audit` exposes the evidence trail.
+
+See [docs/VERIFICATION.md](docs/VERIFICATION.md) for the gates run against the implementation and the live model.
 
 ## License
 

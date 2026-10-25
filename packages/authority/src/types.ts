@@ -9,7 +9,7 @@ export type Actor = {
 export type ObservationSource = {
   class: SourceClass;
   ref: string;
-  excerpt?: string;
+  excerpt?: string | undefined;
 };
 
 export type DecisionProposal = {
