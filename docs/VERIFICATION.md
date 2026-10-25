@@ -45,6 +45,20 @@ Status: PASS on 2026-10-25
 6. The database contained exactly one calendar effect, proving the rejected action caused no side effect.
 7. Seven audit events described the complete run.
 
+## Gate 5 — selective repair acceptance case
+
+Status: PASS on 2026-10-25
+
+The fixture contains three related results (client proposal, delivery plan, and task board), one independent provider comparison, two human edits, and one completed task. A six-hour availability change is prepared as a provisional repair rather than applied immediately.
+
+- The preview identifies exactly the three affected results and leaves the independent comparison unchanged.
+- The approved repair changes only addressed fields; the manually edited price and accessibility requirement survive.
+- The completed task keeps its identifier and `done` status.
+- A model-suggested overwrite of a human-edited price is rejected before a draft is created.
+- If any affected result changes after preview, application fails as stale, records the conflict, and causes no partial repair.
+
+This gate validates the deterministic continuity mechanism. Live Nemotron generation of alternatives and repair operations, the product UI, and comparative evaluation are separate remaining gates.
+
 ## Automated suite
 
 Run:
@@ -53,4 +67,4 @@ Run:
 npm run check
 ```
 
-Current result: 8 tests pass across authority, model-boundary, and transactional-action suites, with TypeScript strict checking enabled.
+Current result: 11 tests pass across authority, model-boundary, transactional-action, and selective-repair suites, with TypeScript strict checking enabled.

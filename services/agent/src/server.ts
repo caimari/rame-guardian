@@ -7,6 +7,7 @@ import { loadReceiptSigner } from "./keys.js";
 import { SqliteAuthorityRepository } from "./sqlite-repository.js";
 import { NebiusClient } from "./nebius-client.js";
 import { ActionConflictError, protectedActionInputSchema, SqliteActionExecutor } from "./action-executor.js";
+import { createResultSchema, humanEditSchema, prepareRepairSchema, ProtectedHumanEditError, RevisionConflictError, SqliteRevisionWorkspace } from "./revision-workspace.js";
 
 const dataDirectory = process.env.RAME_DATA_DIR ?? join(process.cwd(), "data");
 mkdirSync(dataDirectory, { recursive: true, mode: 0o700 });
@@ -14,6 +15,7 @@ const repository = new SqliteAuthorityRepository(join(dataDirectory, "guardian.d
 const signer = loadReceiptSigner(dataDirectory);
 const authority = new AuthorityEngine(signer, () => new Date(), repository);
 const actionExecutor = new SqliteActionExecutor(repository, authority);
+const revisions = new SqliteRevisionWorkspace(repository);
 const app = Fastify({ logger: true, bodyLimit: 512 * 1024 });
 const nebius = process.env.NEBIUS_API_KEY ? new NebiusClient(process.env.NEBIUS_API_KEY, process.env.NEBIUS_MODEL) : null;
 
@@ -85,6 +87,45 @@ app.post("/v1/actions/execute", async (request, reply) => {
 
 app.get("/v1/outputs/tasks", async (request) => ({ tasks: actionExecutor.listTasks(userId(request)) }));
 app.get("/v1/outputs/calendar", async (request) => ({ calendarBlocks: actionExecutor.listCalendarBlocks(userId(request)) }));
+app.get("/v1/results", async (request) => ({ results: revisions.listResults(userId(request)) }));
+
+app.post("/v1/results", async (request, reply) => {
+  const parsed = createResultSchema.safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: "invalid_result", details: parsed.error.issues });
+  return reply.code(201).send({ result: revisions.createResult(userId(request), parsed.data) });
+});
+
+app.post<{ Params: { id: string } }>("/v1/results/:id/human-edit", async (request, reply) => {
+  const parsed = humanEditSchema.safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: "invalid_edit", details: parsed.error.issues });
+  const result = revisions.applyHumanEdit(userId(request), request.params.id, parsed.data.path, parsed.data.value);
+  return result ? { result } : reply.code(404).send({ error: "result_not_found" });
+});
+
+app.post("/v1/repairs/prepare", async (request, reply) => {
+  const parsed = prepareRepairSchema.safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: "invalid_repair", details: parsed.error.issues });
+  try {
+    return reply.code(201).send({ repair: revisions.prepareRepair(userId(request), parsed.data) });
+  } catch (error) {
+    if (error instanceof ProtectedHumanEditError) return reply.code(409).send({ error: "human_edit_protected", message: error.message, resultId: error.resultId, path: error.path });
+    throw error;
+  }
+});
+
+app.get<{ Params: { id: string } }>("/v1/repairs/:id", async (request, reply) => {
+  const repair = revisions.getRepair(userId(request), request.params.id);
+  return repair ? { repair } : reply.code(404).send({ error: "repair_not_found" });
+});
+
+app.post<{ Params: { id: string } }>("/v1/repairs/:id/apply", async (request, reply) => {
+  try {
+    return revisions.applyRepair(userId(request), request.params.id);
+  } catch (error) {
+    if (error instanceof RevisionConflictError) return reply.code(409).send({ error: "repair_stale", message: error.message, conflicts: error.conflicts });
+    throw error;
+  }
+});
 app.get("/v1/audit", async (request) => ({ events: repository.listAuditEvents(userId(request)) }));
 
 app.post("/v1/agent/inspect-document", async (request, reply) => {
