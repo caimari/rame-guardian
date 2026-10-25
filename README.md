@@ -1,22 +1,25 @@
 # RAME Guardian
 
-RAME Guardian is a Personal AI agent with explicit, versioned, user-authorized memory. It turns durable context into a proposal, shows the exact claim to the user, and persists it only after an affirmative action.
+RAME Guardian is a Personal AI agent with explicit, versioned, user-authorized decisions. It extracts useful work from untrusted documents without allowing models, tools, documents, or stale sessions to silently rewrite user authority.
 
 Built for the **Nebius x NVIDIA Global AI Hackathon 2026** using NVIDIA Nemotron through Nebius Token Factory.
 
 ## The trust loop
 
-1. **Observed** — the agent detects potentially useful durable context.
-2. **Proposed** — the user sees the exact statement, scope, source, and confidence.
-3. **Authorized** — an immutable version and SHA-256 receipt are written with an audit event.
+1. **Observed** — Nemotron reads a document as untrusted evidence.
+2. **Proposed** — model output remains a proposal, never authorization.
+3. **Authorized** — only the authenticated user creates a versioned decision and Ed25519 receipt.
+4. **Executed** — every protected action checks the latest decision version and constraints.
+5. **Evidenced** — allowed and blocked attempts appear in a human-readable audit trail.
 
 ## Architecture
 
 - Web client: Next.js-compatible Vinext application
 - Agent API: shared HTTP contracts designed for web now and a future VS Code client
-- Model: `nvidia/Nemotron-3_5-Lightning`
+- Model: `nvidia/nemotron-3-super-120b-a12b`
 - Inference: Nebius Token Factory
 - Durable storage: Cloudflare D1 with Drizzle ORM
+- Receipts: server-side Ed25519 signatures with a persistent public verification key
 - Identity: ChatGPT identity headers on the private hosted build
 
 The `NEBIUS_API_KEY` is a server-side deployment secret. It is never sent to the browser or committed to source control.
