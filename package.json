@@ -11,7 +11,9 @@
     "test:live-repair": "tsx scripts/live-selective-repair.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "check:engine": "npm run typecheck && npm test",
+    "check:web": "npm run check --workspace @rame/guardian-web",
+    "check": "npm run check:engine && npm run check:web"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
