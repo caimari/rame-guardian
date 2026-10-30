@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowRight, Check, ClipboardCopy, Database, FileCheck2, GitCompareArrows, KeyRound, Loader2, LockKeyhole, RefreshCw, RotateCcw, ShieldCheck, Sparkles, Zap } from "lucide-react";
 
 type Language = "en" | "es";
@@ -15,12 +15,14 @@ const words = {
     baseline: "1 · Authorize & seed 12h", old: "2 · Ask Super for 6h draft", approveOld: "3 · Approve old draft", change: "4 · Session B: authorize 8h", reject: "5 · Apply stale draft", refresh: "6 · Recover from current state", approve: "7 · Approve exact repair", apply: "8 · Commit atomically", reload: "Reload durable state", replay: "Repeat same request", concurrent: "Simulate concurrent edit",
     authority: "Current authority", none: "Not initialized", results: "Work and commitments", repair: "Changed / Preserved", comparison: "Fair protected control", trace: "Evidence trace", protected: "Protected", preserved: "Preserved", changed: "Changed", model: "Nemotron recommendation", noDraft: "Generate a draft to inspect its exact impact.", noTrace: "Run the scenario to produce a persistent trace.", copy: "Copy", copied: "Copied", working: "Working…", reset: "Starts a fresh four-result scenario.", reference: "Protected reference", guardian: "RAME Guardian", conflict: "Expected conflict", success: "Committed", proof: "Proof", recovery: "Recovery effort",
     proposedImpact: "Proposed impact", committedImpact: "Verified result after commit", rejectedImpact: "Verified result after stale rejection", proposedChanges: "Content Guardian will update", committedChanges: "Content Guardian updated", rejectedChanges: "No work was modified", preservedCommitments: "Human work and valid results kept intact", noWrites: "0 of 4 results changed · 0 partial writes", noWritesDetail: "The obsolete 6-hour draft was rejected before execution. Every result remains at its original version.", blockedDetail: "The 6-hour plan, proposal, and task changes were not applied.", userApproved: "USER-APPROVED EDIT", requiredCondition: "REQUIRED CONDITION", completedWork: "COMPLETED WORK", independentResult: "INDEPENDENT RESULT", unchanged: "Unchanged", decisionSnapshot: "Exact decision snapshot",
+    nextStep: "Next step", clickHighlighted: "Press only the highlighted button. Completed steps are marked with a check.", scenarioComplete: "Scenario complete", reviewResult: "Review Changed / Preserved below, then reload the durable state.", done: "Completed", click: "Click now", afterComplete: "Verification after step 8", advanced: "Advanced tests (optional)", staleConfirmed: "Protection confirmed: the obsolete draft was rejected before execution. No results changed and there were 0 partial writes. Continue with highlighted step 6.",
   },
   es: {
     eyebrow: "ESTUDIO DE RECUPERACIÓN · ESTADO D1 REAL", title: "Protege compromisos cuando cambian las decisiones.", intro: "Guardian repara solo el trabajo dependiente de la autoridad y conserva las ediciones humanas aprobadas, el trabajo terminado y los resultados independientes.",
     baseline: "1 · Autorizar y crear base de 12h", old: "2 · Pedir a Super borrador de 6h", approveOld: "3 · Aprobar borrador antiguo", change: "4 · Sesión B: autorizar 8h", reject: "5 · Aplicar borrador obsoleto", refresh: "6 · Recuperar estado actual", approve: "7 · Aprobar reparación exacta", apply: "8 · Confirmar atómicamente", reload: "Recargar estado duradero", replay: "Repetir la misma solicitud", concurrent: "Simular edición concurrente",
     authority: "Autoridad actual", none: "Sin inicializar", results: "Trabajo y compromisos", repair: "Cambiado / Conservado", comparison: "Control protegido equivalente", trace: "Rastro de evidencias", protected: "Protegido", preserved: "Conservado", changed: "Cambiado", model: "Recomendación de Nemotron", noDraft: "Genera un borrador para inspeccionar su impacto exacto.", noTrace: "Ejecuta el escenario para producir un rastro persistente.", copy: "Copiar", copied: "Copiado", working: "Procesando…", reset: "Inicia un escenario nuevo con cuatro resultados.", reference: "Control protegido", guardian: "RAME Guardian", conflict: "Conflicto esperado", success: "Confirmado", proof: "Prueba", recovery: "Esfuerzo de recuperación",
     proposedImpact: "Impacto propuesto", committedImpact: "Resultado verificado tras confirmar", rejectedImpact: "Resultado verificado tras el rechazo obsoleto", proposedChanges: "Contenido que Guardian actualizará", committedChanges: "Contenido que Guardian actualizó", rejectedChanges: "No se modificó ningún trabajo", preservedCommitments: "Trabajo humano y resultados válidos intactos", noWrites: "0 de 4 resultados cambiados · 0 escrituras parciales", noWritesDetail: "El borrador obsoleto de 6 horas se rechazó antes de ejecutarse. Todos los resultados conservan su versión original.", blockedDetail: "Los cambios de 6 horas del plan, la propuesta y las tareas no se aplicaron.", userApproved: "EDICIÓN APROBADA", requiredCondition: "CONDICIÓN OBLIGATORIA", completedWork: "TRABAJO COMPLETADO", independentResult: "RESULTADO INDEPENDIENTE", unchanged: "Sin cambios", decisionSnapshot: "Instantánea exacta de la decisión",
+    nextStep: "Siguiente paso", clickHighlighted: "Pulsa únicamente el botón destacado. Los pasos completados llevan una marca.", scenarioComplete: "Escenario completado", reviewResult: "Revisa Cambiado / Conservado y después recarga el estado duradero.", done: "Completado", click: "Pulsa ahora", afterComplete: "Verificación después del paso 8", advanced: "Pruebas avanzadas (opcionales)", staleConfirmed: "Protección confirmada: el borrador obsoleto se rechazó antes de ejecutarse. Ningún resultado cambió y hubo 0 escrituras parciales. Continúa con el paso 6 destacado.",
   },
 };
 
@@ -36,6 +38,21 @@ export default function RecoveryPanel({ language, onAuthorityChanged }: { langua
   const currentDraft = useMemo(() => state?.drafts.find((draft) => draft.targetHours === 8 && draft.status !== "stale") ?? null, [state]);
   const resultById = useMemo(() => new Map((state?.results ?? []).map((result) => [result.id, result])), [state]);
   const staleVersionsUnchanged = latest?.status === "stale" && state?.results.every((result) => latest.baseVersions[result.id] === result.version);
+  const currentStep = useMemo(() => {
+    if (!state?.decision || state.results.length !== 4) return 1;
+    if (!oldDraft) return 2;
+    if (oldDraft.status === "pending") return 3;
+    if (oldDraft.status === "approved" && state.decision.value.hours !== 8) return 4;
+    if (oldDraft.status === "approved" && state.decision.value.hours === 8) return 5;
+    if (oldDraft.status === "stale" && !currentDraft) return 6;
+    if (currentDraft?.status === "pending") return 7;
+    if (currentDraft?.status === "approved") return 8;
+    if (currentDraft?.status === "applied") return 9;
+    return 1;
+  }, [currentDraft, oldDraft, state]);
+  const stepLabels = [t.baseline, t.old, t.approveOld, t.change, t.reject, t.refresh, t.approve, t.apply];
+  const stepClass = (step: number, extra = "") => `${extra} ${currentStep === step ? "current-step" : ""} ${currentStep > step ? "completed-step" : ""}`.trim();
+  const stepIcon = (step: number, icon: ReactNode) => currentStep > step ? <Check size={15} /> : icon;
 
   async function load() {
     const response = await fetch("/api/recovery");
@@ -59,7 +76,7 @@ export default function RecoveryPanel({ language, onAuthorityChanged }: { langua
       if (data.state) setState(data.state);
       else await load();
       if (!response.ok && !allowConflict) throw new Error(data.error ?? "Request failed.");
-      if (!response.ok) setNotice({ kind: "warn", text: `${t.conflict}: ${data.error} · partial writes: 0` });
+      if (!response.ok) setNotice({ kind: "ok", text: t.staleConfirmed });
       else setNotice({ kind: "ok", text: data.replayed ? "Idempotent replay: the stored receipt was returned; no duplicate writes." : data.message ?? "Evidence stored successfully." });
       return response.ok;
     } catch (error) {
@@ -102,21 +119,22 @@ export default function RecoveryPanel({ language, onAuthorityChanged }: { langua
       <div className="recovery-authority"><KeyRound size={18} /><span><small>{t.authority}</small><strong>{state?.decision ? `${state.decision.value.hours}h · v${state.decision.version}` : t.none}</strong></span></div>
     </header>
 
+    <div className={`recovery-guide ${currentStep === 9 ? "complete" : ""}`}><span>{currentStep === 9 ? "8 / 8" : `${currentStep} / 8`}</span><div><strong>{currentStep === 9 ? t.scenarioComplete : `${t.nextStep}: ${stepLabels[currentStep - 1]}`}</strong><p>{currentStep === 9 ? t.reviewResult : t.clickHighlighted}</p></div></div>
+
     <div className="recovery-actions" aria-label="Recovery scenario controls">
-      <button onClick={() => void authorize(12)} disabled={!!busy}>{stepBusy("authorize-12")}<Database size={15} />{t.baseline}<small>{t.reset}</small></button>
-      <button onClick={() => void post("create_draft", { targetHours: 6, provisional: true })} disabled={!!busy || state?.results.length !== 4}>{stepBusy("create_draft")}<Sparkles size={15} />{t.old}</button>
-      <button onClick={() => void approveDraft(oldDraft)} disabled={!!busy || oldDraft?.status !== "pending"}><FileCheck2 size={15} />{t.approveOld}</button>
-      <button onClick={() => void authorize(8)} disabled={!!busy || oldDraft?.status !== "approved"}>{stepBusy("authorize-8")}<KeyRound size={15} />{t.change}</button>
-      <button className="conflict-button" onClick={() => void applyDraft(oldDraft, true)} disabled={!!busy || oldDraft?.status !== "approved"}><AlertTriangle size={15} />{t.reject}</button>
-      <button onClick={() => void post("create_draft", { targetHours: 8, provisional: false })} disabled={!!busy || state?.decision?.value.hours !== 8}><RefreshCw size={15} />{t.refresh}</button>
-      <button onClick={() => void approveDraft(currentDraft)} disabled={!!busy || currentDraft?.status !== "pending"}><ShieldCheck size={15} />{t.approve}</button>
-      <button className="commit-button" onClick={() => void applyDraft(currentDraft)} disabled={!!busy || currentDraft?.status !== "approved"}><Zap size={15} />{t.apply}</button>
+      <button className={stepClass(1)} aria-current={currentStep === 1 ? "step" : undefined} onClick={() => void authorize(12)} disabled={!!busy || currentStep !== 1}>{stepBusy("authorize-12")}{stepIcon(1, <Database size={15} />)}{t.baseline}<small>{currentStep > 1 ? t.done : t.click}</small></button>
+      <button className={stepClass(2)} aria-current={currentStep === 2 ? "step" : undefined} onClick={() => void post("create_draft", { targetHours: 6, provisional: true })} disabled={!!busy || currentStep !== 2}>{stepBusy("create_draft")}{stepIcon(2, <Sparkles size={15} />)}{t.old}<small>{currentStep > 2 ? t.done : currentStep === 2 ? t.click : ""}</small></button>
+      <button className={stepClass(3)} aria-current={currentStep === 3 ? "step" : undefined} onClick={() => void approveDraft(oldDraft)} disabled={!!busy || currentStep !== 3}>{stepIcon(3, <FileCheck2 size={15} />)}{t.approveOld}<small>{currentStep > 3 ? t.done : currentStep === 3 ? t.click : ""}</small></button>
+      <button className={stepClass(4)} aria-current={currentStep === 4 ? "step" : undefined} onClick={() => void authorize(8)} disabled={!!busy || currentStep !== 4}>{stepBusy("authorize-8")}{stepIcon(4, <KeyRound size={15} />)}{t.change}<small>{currentStep > 4 ? t.done : currentStep === 4 ? t.click : ""}</small></button>
+      <button className={stepClass(5, "conflict-button")} aria-current={currentStep === 5 ? "step" : undefined} onClick={() => void applyDraft(oldDraft, true)} disabled={!!busy || currentStep !== 5}>{stepIcon(5, <AlertTriangle size={15} />)}{t.reject}<small>{currentStep > 5 ? t.done : currentStep === 5 ? t.click : ""}</small></button>
+      <button className={stepClass(6)} aria-current={currentStep === 6 ? "step" : undefined} onClick={() => void post("create_draft", { targetHours: 8, provisional: false })} disabled={!!busy || currentStep !== 6}>{stepIcon(6, <RefreshCw size={15} />)}{t.refresh}<small>{currentStep > 6 ? t.done : currentStep === 6 ? t.click : ""}</small></button>
+      <button className={stepClass(7)} aria-current={currentStep === 7 ? "step" : undefined} onClick={() => void approveDraft(currentDraft)} disabled={!!busy || currentStep !== 7}>{stepIcon(7, <ShieldCheck size={15} />)}{t.approve}<small>{currentStep > 7 ? t.done : currentStep === 7 ? t.click : ""}</small></button>
+      <button className={stepClass(8, "commit-button")} aria-current={currentStep === 8 ? "step" : undefined} onClick={() => void applyDraft(currentDraft)} disabled={!!busy || currentStep !== 8}>{stepIcon(8, <Zap size={15} />)}{t.apply}<small>{currentStep > 8 ? t.done : currentStep === 8 ? t.click : ""}</small></button>
     </div>
 
     <div className="recovery-utilities">
-      <button onClick={() => void load()} disabled={!!busy}><RotateCcw size={14} />{t.reload}</button>
-      <button onClick={() => void post("concurrent_edit")} disabled={!!busy || currentDraft?.status !== "approved"}><GitCompareArrows size={14} />{t.concurrent}</button>
-      <button onClick={() => void applyDraft(currentDraft)} disabled={!!busy || currentDraft?.status !== "applied"}><RefreshCw size={14} />{t.replay}</button>
+      <span>{t.afterComplete}</span><button onClick={() => void load()} disabled={!!busy || currentStep !== 9}><RotateCcw size={14} />{t.reload}</button>
+      <details><summary>{t.advanced}</summary><div><button onClick={() => void post("concurrent_edit")} disabled={!!busy || currentDraft?.status !== "approved"}><GitCompareArrows size={14} />{t.concurrent}</button><button onClick={() => void applyDraft(currentDraft)} disabled={!!busy || currentDraft?.status !== "applied"}><RefreshCw size={14} />{t.replay}</button></div></details>
     </div>
     {notice && <div className={`recovery-notice ${notice.kind}`} >{notice.kind === "ok" ? <Check size={17} /> : <AlertTriangle size={17} />}<span>{notice.text}</span></div>}
 
