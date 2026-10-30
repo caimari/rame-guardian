@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
+import { requestIdentity } from "./demo-session";
 
-export function requestUserId(request: Request) {
-  return request.headers.get("oai-authenticated-user-id") ?? "private-demo-user";
+export async function requestUserId(request: Request) {
+  return (await requestIdentity(request))?.userId ?? null;
 }
 
 export function canonicalJson(value: unknown): string {

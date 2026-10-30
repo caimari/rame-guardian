@@ -16,6 +16,8 @@ The deployed application contains three connected workspaces:
 2. **Guardian Lab** — Nemotron Super extracts useful work from an untrusted document while an external policy gate isolates hidden authorization overrides and blocks stale or unauthorized actions.
 3. **Recovery Studio** — a 12-hour delivery plan is revised after the user authorizes a newer eight-hour availability decision. An older six-hour repair is rejected, current state is recovered, and a new selective repair is reviewed and committed atomically.
 
+The public evaluation build starts in Recovery Studio and requires no account. Each browser receives a random, short-lived, HttpOnly session cookie; only its SHA-256 digest is stored. Every data route validates that server-side session before reading or writing D1. The header includes a session-scoped reset, and model calls are limited per session and globally to protect the shared Nebius evaluation budget.
+
 ## What the recovery demonstrates
 
 The acceptance scenario uses four durable results:
@@ -156,6 +158,8 @@ The recorded passing run used `nvidia/nemotron-3-super-120b-a12b`, returned two 
 - Model output is always untrusted until validated.
 - Documents cannot create user authorization.
 - Runtime secrets never enter browser bundles or Git history.
+- Anonymous evaluation sessions are isolated in D1 and cannot select their own user identifier.
+- Nebius calls have hourly per-session and global limits; deterministic actions remain available without consuming model credits.
 - Approved repairs are tied to decision and result versions.
 - D1 batch failure rolls back the complete repair.
 - The project does not contain or call Core, Core2, RAME Code, or other private research systems.

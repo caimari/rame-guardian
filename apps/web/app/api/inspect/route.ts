@@ -1,13 +1,17 @@
 import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { requestUserId } from "../../../lib/authority";
+import { consumeModelBudget } from "../../../lib/demo-session";
 import { inspectWithNebius } from "../../../lib/nebius";
 
 export async function POST(request: Request) {
   try {
-    const userId = requestUserId(request);
+    const userId = await requestUserId(request);
+    if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
     const body = await request.json() as { title?: unknown; content?: unknown };
     if (typeof body.title !== "string" || typeof body.content !== "string" || !body.title.trim() || !body.content.trim() || body.content.length > 100_000) return NextResponse.json({ error: "Invalid document." }, { status: 400 });
+    const budget = await consumeModelBudget(userId);
+    if (!budget.allowed) return NextResponse.json({ error: "Demo model-call limit reached. Please retry after the current hourly window." }, { status: 429, headers: { "Retry-After": String(budget.retryAfter) } });
     const rows = await env.DB.prepare(`SELECT decision_key, value_json, statement, version FROM authority_decisions d WHERE user_id = ? AND status = 'active'
       AND version = (SELECT MAX(d2.version) FROM authority_decisions d2 WHERE d2.user_id=d.user_id AND d2.decision_key=d.decision_key)`).bind(userId).all<{ decision_key: string; value_json: string; statement: string; version: number }>();
     const decisions = rows.results.map((row) => ({ key: row.decision_key, value: JSON.parse(row.value_json), statement: row.statement, version: row.version }));

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { requestUserId, sha256 } from "../../../lib/authority";
+import { consumeModelBudget } from "../../../lib/demo-session";
 import { repairWithNemotron } from "../../../lib/nebius";
 
 type DecisionRow = { id: string; decision_key: string; value_json: string; statement: string; version: number; authorized_at: number };
@@ -12,7 +13,9 @@ const DECISION_KEY = "work.available_hours";
 
 export async function GET(request: Request) {
   try {
-    return NextResponse.json(await readState(requestUserId(request)));
+    const userId = await requestUserId(request);
+    if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
+    return NextResponse.json(await readState(userId));
   } catch (error) {
     console.error("recovery_read_failed", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ error: "Recovery state could not be loaded." }, { status: 500 });
@@ -20,12 +23,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const userId = requestUserId(request);
+  const userId = await requestUserId(request);
+  if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
   try {
     const body = await request.json() as Record<string, unknown>;
     switch (body.action) {
       case "initialize": return initialize(userId);
-      case "create_draft": return createDraft(userId, Number(body.targetHours), body.provisional === true);
+      case "create_draft": {
+        const budget = await consumeModelBudget(userId);
+        if (!budget.allowed) return NextResponse.json({ error: "Demo model-call limit reached. Please retry after the current hourly window." }, { status: 429, headers: { "Retry-After": String(budget.retryAfter) } });
+        return createDraft(userId, Number(body.targetHours), body.provisional === true);
+      }
       case "approve": return approve(userId, String(body.draftId ?? ""));
       case "apply": return apply(userId, String(body.draftId ?? ""), String(body.requestId ?? ""));
       case "concurrent_edit": return concurrentEdit(userId);

@@ -5,7 +5,8 @@ import { requestUserId, sha256 } from "../../../lib/authority";
 type Reference = { key: string; version: number };
 
 export async function POST(request: Request) {
-  const userId = requestUserId(request);
+  const userId = await requestUserId(request);
+  if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
   const body = await request.json() as { id?: unknown; tool?: unknown; parameters?: Record<string, unknown>; decisions?: Reference[] };
   if (typeof body.id !== "string" || body.tool !== "calendar.create_block" || !body.parameters || !Array.isArray(body.decisions) || body.decisions.length === 0) return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   const hash = await sha256({ ...body, userId });

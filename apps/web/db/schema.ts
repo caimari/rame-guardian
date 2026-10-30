@@ -84,3 +84,16 @@ export const repairApplications = sqliteTable("repair_applications", {
 export const repairAssertions = sqliteTable("repair_assertions", {
   id: text("id").primaryKey(), ok: integer("ok").notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [check("repair_assertion_must_hold", sql`${table.ok} = 1`)]);
+
+export const demoSessions = sqliteTable("demo_sessions", {
+  idHash: text("id_hash").primaryKey(),
+  createdAt: integer("created_at").notNull(),
+  lastSeenAt: integer("last_seen_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});
+
+export const demoRateLimits = sqliteTable("demo_rate_limits", {
+  bucketKey: text("bucket_key").primaryKey(),
+  count: integer("count").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});

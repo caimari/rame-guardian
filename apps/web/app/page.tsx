@@ -3,5 +3,5 @@ import GuardianApp from "./guardian-app";
 
 export default async function Home() {
   const user = await getChatGPTUser();
-  return <GuardianApp displayName={user?.displayName ?? "Antoni"} />;
+  return <GuardianApp displayName={user?.displayName ?? "Guest"} />;
 }

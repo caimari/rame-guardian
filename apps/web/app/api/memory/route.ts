@@ -3,14 +3,13 @@ import { NextResponse } from "next/server";
 import { getDb } from "../../../db";
 import { auditEvents, memoryVersions } from "../../../db/schema";
 import type { MemoryProposal } from "../../../lib/contracts";
-
-function userId(request: Request) {
-  return request.headers.get("oai-authenticated-user-id") ?? "private-demo-user";
-}
+import { requestUserId } from "../../../lib/authority";
 
 export async function GET(request: Request) {
   try {
-    const rows = await getDb().select().from(memoryVersions).where(eq(memoryVersions.userId, userId(request))).orderBy(desc(memoryVersions.createdAt)).limit(50);
+    const userId = await requestUserId(request);
+    if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
+    const rows = await getDb().select().from(memoryVersions).where(eq(memoryVersions.userId, userId)).orderBy(desc(memoryVersions.createdAt)).limit(50);
     return NextResponse.json({ memories: rows.filter((row) => row.status === "authorized") });
   } catch (error) {
     console.error("memory_read_failed", error instanceof Error ? error.message : "unknown");
@@ -20,6 +19,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const userId = await requestUserId(request);
+    if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
     const body = (await request.json()) as MemoryProposal;
     const scopes = ["preference", "workflow", "project"];
     if (typeof body.statement !== "string" || body.statement.length < 3 || body.statement.length > 320 || !scopes.includes(body.scope)) {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     const id = crypto.randomUUID();
     const now = new Date();
     const digest = await sha256(`${body.scope}:${body.statement}`);
-    const record = { id, userId: userId(request), statement: body.statement, scope: body.scope, confidence: Math.max(0, Math.min(1, Number(body.confidence) || 0)), version: 1, digest, source: "conversation", status: "authorized" as const, createdAt: now };
+    const record = { id, userId, statement: body.statement, scope: body.scope, confidence: Math.max(0, Math.min(1, Number(body.confidence) || 0)), version: 1, digest, source: "conversation", status: "authorized" as const, createdAt: now };
     const db = getDb();
     await db.batch([
       db.insert(memoryVersions).values(record),

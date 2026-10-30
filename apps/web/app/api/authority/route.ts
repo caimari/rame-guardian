@@ -6,7 +6,8 @@ type ProposalRow = { id: string; user_id: string; decision_key: string; kind: st
 type DecisionRow = { id: string; decision_key: string; kind: string; value_json: string; statement: string; version: number; previous_decision_id: string | null; authorized_at: number; status: string };
 
 export async function GET(request: Request) {
-  const userId = requestUserId(request);
+  const userId = await requestUserId(request);
+  if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
   const [decisions, receipts, events, calendar] = await Promise.all([
     env.DB.prepare(`SELECT d.* FROM authority_decisions d WHERE d.user_id = ? AND d.status = 'active'
       AND d.version = (SELECT MAX(d2.version) FROM authority_decisions d2 WHERE d2.user_id=d.user_id AND d2.decision_key=d.decision_key)
@@ -24,7 +25,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const userId = requestUserId(request);
+  const userId = await requestUserId(request);
+  if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
   const body = await request.json() as Record<string, unknown>;
   if (body.action === "propose") return propose(userId, body);
   if (body.action === "authorize") return authorize(userId, String(body.proposalId ?? ""));
