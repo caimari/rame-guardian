@@ -2,11 +2,139 @@
 
 **A personal AI that repairs its work when user decisions change—without overwriting human edits or trusting hidden instructions.**
 
-[Live demo](https://guardian.ramesystem.com) · [Verification record](docs/VERIFICATION.md) · [Evaluation protocol](docs/EVALUATION.md)
+[Live demo](https://guardian.ramesystem.com) · [Submission video](https://vimeo.com/1241378616) · [Exact judge walkthrough](#exact-recovery-studio-walkthrough) · [Verification record](docs/VERIFICATION.md) · [Evaluation protocol](docs/EVALUATION.md)
 
 RAME Guardian is a submission for the **Nebius x NVIDIA Global AI Hackathon 2026**, built for the Personal AI track. It uses NVIDIA Nemotron at runtime through Nebius Token Factory.
 
 Ordinary assistant memory can preserve text while losing an important distinction: what the model observed, what it proposed, and what the user actually authorized. Guardian keeps those states separate. When an authorized decision changes, it identifies affected work, asks Nemotron for a selective repair, preserves compatible human edits and independent results, and applies the approved revision only if every reviewed version is still current.
+
+## Quick start for judges
+
+The public demo requires **no account, password, API key, or installation**. It uses isolated anonymous sessions and sample data.
+
+1. Open the [live demo](https://guardian.ramesystem.com). Select **Recovery Studio** if it is not already active.
+2. Select **Reset demo** in the header. The starting state must say **Not initialized** and highlight only step 1.
+3. Press only the highlighted button, in order from **1** through **8**. A check means that the expected step completed; it is not another button to press.
+4. After each step, scroll below the controls and inspect **Work and commitments**, **Changed / Preserved**, and **Evidence trace**. The field-by-field guide follows below.
+5. At step 5, rejection is the expected success condition: Guardian must show **0 of 4 results changed · 0 partial writes**. Continue with the highlighted step 6.
+6. After step 8, confirm that the three authority-dependent results are at `v2`, the independent result remains at `v1`, and the protected commitments are unchanged. Select **Reload durable state** to verify persistence.
+
+Expected outcome: Guardian rejects the obsolete six-hour repair without modifying work, then uses NVIDIA Nemotron through Nebius to prepare a current eight-hour repair. Only the delivery plan, delivery wording, and unfinished training task change. The approved price (`€2,600`), accessibility requirement (`WCAG AAA checkout`), completed architecture audit, and independent research result remain intact.
+
+The two model-assisted draft steps use live inference, so explanatory wording may vary. Authorization, version checks, protected fields, stale rejection, and atomic application are enforced deterministically outside the model. **Advanced tests are optional and are not part of the main walkthrough.**
+
+### Exact Recovery Studio walkthrough
+
+The visible evidence areas have distinct roles:
+
+- **Current authority** is the latest user-authorized availability decision. `12h · v1` means 12 hours, decision version 1.
+- **Work and commitments** contains four durable results. A result version changes only after a successful commit.
+- **Changed / Preserved** shows the exact proposed or committed content changes and the commitments that must remain intact.
+- **Evidence trace** is the append-only sequence of baseline, draft, approval, rejection, and application events.
+- **Fair protected control** is supporting context for the final comparison; it does not need to be reread after every step.
+
+`pending` means proposed but not approved. `approved` means the exact draft was authorized but has not changed durable work. `stale` means its reviewed assumptions are obsolete and it was rejected. `applied` means the approved repair was committed.
+
+#### 1 — Authorize and seed the 12-hour baseline
+
+Select **1 · Authorize & seed 12h**. Confirm:
+
+- **Current authority:** `12h · v1`.
+- **Delivery plan v1:** 12 hours; allocation `Core build · 6h`, `Validation · 3h`, `Demo · 3h`; mode `full`.
+- **Client proposal v1:** price `€2,600`; accessibility `WCAG AAA checkout`; full scope by October 30.
+- **Execution board v1:** Architecture audit is `done`; checkout and training are `todo`.
+- **Independent research note v1:** `reviewed · No availability dependency`.
+- **Evidence trace:** `Baseline Initialized`.
+
+These are the commitments Guardian must keep coherent. The price is a user-approved edit, accessibility is a required condition, the audit is completed work, and the research note is independent of availability.
+
+#### 2 — Ask Nemotron for an old six-hour draft
+
+Select **2 · Ask Super for 6h draft** and wait for live inference. In **Changed / Preserved**, confirm:
+
+- Status: `pending · 6h`.
+- The preview reduces the plan, narrows the delivery wording, and defers unfinished training.
+- Price, accessibility, completed audit, and independent research remain unchanged.
+- All four durable results are still `v1`.
+- **Evidence trace:** `Draft Created`.
+
+Nemotron has proposed a repair, but no durable work has been changed.
+
+#### 3 — Approve the old draft
+
+Select **3 · Approve old draft**. Confirm:
+
+- Status changes to `approved · 6h`.
+- **Evidence trace** adds `Draft Approved` with an approval hash.
+- Every durable result remains at `v1` with unchanged content.
+
+Approval binds the exact proposal to the reviewed decision and result versions; it still does not execute it.
+
+#### 4 — Authorize the newer eight-hour decision
+
+Select **4 · Session B: authorize 8h**. Confirm:
+
+- **Current authority** advances to `8h · v2`.
+- The approved six-hour draft still targets decision `v1`.
+- All four work products remain at `v1`.
+
+The older repair is now obsolete even though it was valid when approved.
+
+#### 5 — Attempt the obsolete repair
+
+Select **5 · Apply stale draft**. Rejection is the expected success condition; a completed check on step 5 means the protection test passed. Confirm:
+
+- The notice says the obsolete draft was rejected before execution.
+- **Changed / Preserved:** `0 of 4 results changed · 0 partial writes` and `No work was modified`.
+- **Evidence trace:** `Stale Rejected`.
+- Every result remains at `v1`; authority remains `8h · v2`.
+
+Guardian rechecked current authority at execution time and rejected the entire stale operation.
+
+#### 6 — Recover from the current state
+
+Select **6 · Recover from current state** and wait for Nemotron. Confirm that the new draft is `pending · 8h` and targets decision snapshot `v2`.
+
+**Changed** previews exactly three affected results:
+
+- Delivery plan: `12 → 8` hours; allocation `6/3/3 → 4/2/2`; mode `full → focused`.
+- Client proposal: only the delivery commitment changes to focused scope with asynchronous training.
+- Execution board: unfinished training changes `todo → async` and moves outside the critical delivery path.
+
+**Preserved** must show:
+
+- Approved price: `€2,600`.
+- Accessibility: `WCAG AAA checkout`.
+- Completed work: `Architecture audit · done`.
+- Independent result: `reviewed · No availability dependency`.
+
+All four durable results must still be `v1`; this is a reviewed preview, not a write. **Evidence trace** adds a new `Draft Created` event.
+
+#### 7 — Approve the exact current repair
+
+Select **7 · Approve exact repair**. Confirm:
+
+- Status: `approved · 8h`.
+- The same exact changes and preserved commitments remain visible.
+- **Evidence trace:** a new `Draft Approved` event.
+- All durable work remains at `v1`.
+
+The user has authorized this exact repair against decision `v2` and the reviewed base versions, but it has not been committed yet.
+
+#### 8 — Commit atomically
+
+Select **8 · Commit atomically**. Confirm:
+
+- The guide says `8 / 8 — Scenario complete`.
+- The notice says `Selective repair committed atomically`.
+- Delivery plan is `v2`, with 8 hours and allocation `4/2/2`.
+- Client proposal is `v2`, with updated delivery wording but the same price and accessibility requirement.
+- Execution board is `v2`, with the audit still `done` and training now asynchronous.
+- Independent research remains unchanged at `v1`.
+- **Changed / Preserved** now describes the verified result after commit.
+- **Evidence trace:** `Applied`, with three atomic writes.
+
+Exactly the three authority-dependent results changed together. Select **Reload durable state** and confirm that the same final versions and values remain after the server reads them again. Reload does not rerun the model or create another repair.
 
 ## Product experience
 
@@ -96,7 +224,7 @@ npm ci
 
 ## Verify the complete repository
 
-Run strict TypeScript checks, the 14 deterministic engine tests, and web lint/type checks:
+Run strict TypeScript checks, the 17 automated engine tests, and web lint/type checks:
 
 ```bash
 npm run check
