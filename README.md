@@ -2,7 +2,7 @@
 
 **A personal AI that repairs its work when user decisions change—without overwriting human edits or trusting hidden instructions.**
 
-[Live demo](https://guardian.ramesystem.com) · [Submission video](https://vimeo.com/1241378616) · [Exact judge walkthrough](#exact-recovery-studio-walkthrough) · [Verification record](docs/VERIFICATION.md) · [Evaluation protocol](docs/EVALUATION.md)
+[Live demo](https://guardian.ramesystem.com) · [Submission video](https://vimeo.com/1241378616) · [Exact judge walkthrough](#exact-recovery-studio-walkthrough) · [Guía completa en español](docs/GUIA_DEMO_ES.md) · [Verification record](docs/VERIFICATION.md) · [Evaluation protocol](docs/EVALUATION.md)
 
 RAME Guardian is a submission for the **Nebius x NVIDIA Global AI Hackathon 2026**, built for the Personal AI track. It uses NVIDIA Nemotron at runtime through Nebius Token Factory.
 
