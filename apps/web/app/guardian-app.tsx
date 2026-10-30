@@ -147,7 +147,7 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
     <header className="guardian-topbar">
       <a className="guardian-brand" href="#top"><span><ShieldCheck size={20} /></span>RAME <strong>Guardian</strong></a>
       <div className="guardian-live"><i /> {t.private}</div>
-      <nav><button disabled={!!busy} onClick={() => void resetDemo()}><RotateCcw size={15} /> {t.resetDemo}</button><button onClick={() => setLanguage(language === "en" ? "es" : "en")}><Languages size={15} /> {language === "en" ? "ES" : "EN"}</button><a href="https://github.com/caimari" target="_blank" rel="noreferrer"><GitFork size={15} /> GitHub</a><span className="guardian-avatar">{initials}</span></nav>
+      <nav><button disabled={!!busy} onClick={() => void resetDemo()}><RotateCcw size={15} /> {t.resetDemo}</button><button onClick={() => setLanguage(language === "en" ? "es" : "en")}><Languages size={15} /> {language === "en" ? "ES" : "EN"}</button><a href="https://github.com/caimari/rame-guardian" target="_blank" rel="noreferrer"><GitFork size={15} /> GitHub</a><span className="guardian-avatar">{initials}</span></nav>
     </header>
 
     <section className="guardian-hero" id="top">
