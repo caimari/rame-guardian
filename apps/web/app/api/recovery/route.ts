@@ -7,7 +7,7 @@ import { repairWithNemotron } from "../../../lib/nebius";
 type DecisionRow = { id: string; decision_key: string; value_json: string; statement: string; version: number; authorized_at: number };
 type ResultRow = { id: string; kind: string; title: string; version: number; content_json: string; dependencies_json: string; human_edited_paths_json: string; updated_at: number };
 type DraftRow = { id: string; status: string; change_request: string; target_decision_key: string; target_decision_version: number; target_hours: number; base_versions_json: string; operations_json: string; impact_json: string; model_json: string; approval_hash: string | null; approved_at: number | null; applied_at: number | null; created_at: number; updated_at: number };
-type Operation = { resultId: string; nextContent: Record<string, unknown>; reason: string };
+type Operation = { resultId: string; beforeContent: Record<string, unknown>; nextContent: Record<string, unknown>; reason: string };
 
 const DECISION_KEY = "work.available_hours";
 
@@ -169,13 +169,13 @@ async function concurrentEdit(userId: string) {
 function buildOperations(rows: ResultRow[], hours: number): Operation[] {
   return rows.filter((row) => row.kind !== "reference").map((row) => {
     const content = JSON.parse(row.content_json) as Record<string, unknown>;
-    if (row.kind === "plan") return { resultId: row.id, nextContent: { ...content, availableHours: hours, requiredHours: hours, allocation: hours === 6 ? ["Core build · 4h", "Validation · 1h", "Demo · 1h"] : ["Core build · 4h", "Validation · 2h", "Demo · 2h"], deliveryMode: hours === 6 ? "minimum viable" : "focused" }, reason: "Rebalance the authority-dependent plan." };
-    if (row.kind === "proposal") return { resultId: row.id, nextContent: { ...content, deliveryNote: hours === 6 ? "Core scope by October 30; training follows separately" : "Focused scope delivered by October 30; training is asynchronous" }, reason: "Align delivery wording while preserving price and accessibility." };
+    if (row.kind === "plan") return { resultId: row.id, beforeContent: content, nextContent: { ...content, availableHours: hours, requiredHours: hours, allocation: hours === 6 ? ["Core build · 4h", "Validation · 1h", "Demo · 1h"] : ["Core build · 4h", "Validation · 2h", "Demo · 2h"], deliveryMode: hours === 6 ? "minimum viable" : "focused" }, reason: "Rebalance the authority-dependent plan." };
+    if (row.kind === "proposal") return { resultId: row.id, beforeContent: content, nextContent: { ...content, deliveryNote: hours === 6 ? "Core scope by October 30; training follows separately" : "Focused scope delivered by October 30; training is asynchronous" }, reason: "Align delivery wording while preserving price and accessibility." };
     const tasks = Array.isArray(content.tasks) ? content.tasks.map((task) => {
       const item = task as Record<string, unknown>;
       return item.id === "task-training" ? { ...item, status: hours === 6 ? "deferred" : "async", note: "Moved outside the critical delivery path" } : item;
     }) : [];
-    return { resultId: row.id, nextContent: { ...content, tasks }, reason: "Move only unfinished training outside the critical path." };
+    return { resultId: row.id, beforeContent: content, nextContent: { ...content, tasks }, reason: "Move only unfinished training outside the critical path." };
   });
 }
 

@@ -1,23 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, ClipboardCopy, Database, FileCheck2, GitCompareArrows, KeyRound, Loader2, LockKeyhole, RefreshCw, RotateCcw, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, ClipboardCopy, Database, FileCheck2, GitCompareArrows, KeyRound, Loader2, LockKeyhole, RefreshCw, RotateCcw, ShieldCheck, Sparkles, Zap } from "lucide-react";
 
 type Language = "en" | "es";
 type WorkResult = { id: string; kind: string; title: string; version: number; content: Record<string, unknown>; dependencies: string[]; humanEditedPaths: string[] };
-type Draft = { id: string; status: string; targetDecisionVersion: number; targetHours: number; baseVersions: Record<string, number>; operations: Array<{ resultId: string; reason: string; nextContent: Record<string, unknown> }>; impact: { changed: Array<{ resultId: string; reason: string }>; preserved: string[]; protectedFields: string[]; atomicWrites: number }; model: { model: string; recommendation: { summary: string; selectedAlternative: string; rationale: string; preserved: string[]; risks: string[] } }; approvalHash: string | null; createdAt: number };
+type RepairOperation = { resultId: string; reason: string; beforeContent?: Record<string, unknown>; nextContent: Record<string, unknown> };
+type Draft = { id: string; status: string; targetDecisionVersion: number; targetHours: number; baseVersions: Record<string, number>; operations: RepairOperation[]; impact: { changed: Array<{ resultId: string; reason: string }>; preserved: string[]; protectedFields: string[]; atomicWrites: number }; model: { model: string; recommendation: { summary: string; selectedAlternative: string; rationale: string; preserved: string[]; risks: string[] } }; approvalHash: string | null; createdAt: number };
 type RecoveryState = { decision: null | { id: string; version: number; value: { hours?: number }; statement: string }; results: WorkResult[]; drafts: Draft[]; events: Array<{ id: string; action: string; detail: Record<string, unknown>; created_at: number }>; comparison: Record<"guardian" | "reference", { staleRejected: boolean; atomic: boolean; protectedFields: boolean; recovery: string; evidence: string }> };
 
 const words = {
   en: {
-    eyebrow: "RECOVERY STUDIO · LIVE D1 STATE", title: "Recover useful work after authority changes.", intro: "A stale draft is rejected first. Nemotron then proposes the smallest coherent repair; Guardian validates, binds approval to exact versions, and commits once.",
+    eyebrow: "RECOVERY STUDIO · LIVE D1 STATE", title: "Protect commitments when decisions change.", intro: "Guardian repairs only authority-dependent work, while preserving approved human edits, completed work, and independent results.",
     baseline: "1 · Authorize & seed 12h", old: "2 · Ask Super for 6h draft", approveOld: "3 · Approve old draft", change: "4 · Session B: authorize 8h", reject: "5 · Apply stale draft", refresh: "6 · Recover from current state", approve: "7 · Approve exact repair", apply: "8 · Commit atomically", reload: "Reload durable state", replay: "Repeat same request", concurrent: "Simulate concurrent edit",
-    authority: "Current authority", none: "Not initialized", results: "Versioned work results", repair: "Latest repair proposal", comparison: "Fair protected control", trace: "Evidence trace", protected: "Protected", preserved: "Preserved", changed: "Changes", model: "Nemotron recommendation", noDraft: "Generate a draft to inspect its exact impact.", noTrace: "Run the scenario to produce a persistent trace.", copy: "Copy", copied: "Copied", working: "Working…", reset: "Starts a fresh four-result scenario.", reference: "Protected reference", guardian: "RAME Guardian", conflict: "Expected conflict", success: "Committed", proof: "Proof", recovery: "Recovery effort",
+    authority: "Current authority", none: "Not initialized", results: "Work and commitments", repair: "Changed / Preserved", comparison: "Fair protected control", trace: "Evidence trace", protected: "Protected", preserved: "Preserved", changed: "Changed", model: "Nemotron recommendation", noDraft: "Generate a draft to inspect its exact impact.", noTrace: "Run the scenario to produce a persistent trace.", copy: "Copy", copied: "Copied", working: "Working…", reset: "Starts a fresh four-result scenario.", reference: "Protected reference", guardian: "RAME Guardian", conflict: "Expected conflict", success: "Committed", proof: "Proof", recovery: "Recovery effort",
+    proposedImpact: "Proposed impact", committedImpact: "Verified result after commit", rejectedImpact: "Verified result after stale rejection", proposedChanges: "Content Guardian will update", committedChanges: "Content Guardian updated", rejectedChanges: "No work was modified", preservedCommitments: "Human work and valid results kept intact", noWrites: "0 of 4 results changed · 0 partial writes", noWritesDetail: "The obsolete 6-hour draft was rejected before execution. Every result remains at its original version.", blockedDetail: "The 6-hour plan, proposal, and task changes were not applied.", userApproved: "USER-APPROVED EDIT", requiredCondition: "REQUIRED CONDITION", completedWork: "COMPLETED WORK", independentResult: "INDEPENDENT RESULT", unchanged: "Unchanged", decisionSnapshot: "Exact decision snapshot",
   },
   es: {
-    eyebrow: "ESTUDIO DE RECUPERACIÓN · ESTADO D1 REAL", title: "Recupera trabajo útil cuando cambia la autoridad.", intro: "Primero se rechaza un borrador obsoleto. Después Nemotron propone la reparación mínima coherente; Guardian valida, liga la aprobación a versiones exactas y confirma una sola vez.",
+    eyebrow: "ESTUDIO DE RECUPERACIÓN · ESTADO D1 REAL", title: "Protege compromisos cuando cambian las decisiones.", intro: "Guardian repara solo el trabajo dependiente de la autoridad y conserva las ediciones humanas aprobadas, el trabajo terminado y los resultados independientes.",
     baseline: "1 · Autorizar y crear base de 12h", old: "2 · Pedir a Super borrador de 6h", approveOld: "3 · Aprobar borrador antiguo", change: "4 · Sesión B: autorizar 8h", reject: "5 · Aplicar borrador obsoleto", refresh: "6 · Recuperar estado actual", approve: "7 · Aprobar reparación exacta", apply: "8 · Confirmar atómicamente", reload: "Recargar estado duradero", replay: "Repetir la misma solicitud", concurrent: "Simular edición concurrente",
-    authority: "Autoridad actual", none: "Sin inicializar", results: "Resultados de trabajo versionados", repair: "Última propuesta de reparación", comparison: "Control protegido equivalente", trace: "Rastro de evidencias", protected: "Protegido", preserved: "Conservado", changed: "Cambios", model: "Recomendación de Nemotron", noDraft: "Genera un borrador para inspeccionar su impacto exacto.", noTrace: "Ejecuta el escenario para producir un rastro persistente.", copy: "Copiar", copied: "Copiado", working: "Procesando…", reset: "Inicia un escenario nuevo con cuatro resultados.", reference: "Control protegido", guardian: "RAME Guardian", conflict: "Conflicto esperado", success: "Confirmado", proof: "Prueba", recovery: "Esfuerzo de recuperación",
+    authority: "Autoridad actual", none: "Sin inicializar", results: "Trabajo y compromisos", repair: "Cambiado / Conservado", comparison: "Control protegido equivalente", trace: "Rastro de evidencias", protected: "Protegido", preserved: "Conservado", changed: "Cambiado", model: "Recomendación de Nemotron", noDraft: "Genera un borrador para inspeccionar su impacto exacto.", noTrace: "Ejecuta el escenario para producir un rastro persistente.", copy: "Copiar", copied: "Copiado", working: "Procesando…", reset: "Inicia un escenario nuevo con cuatro resultados.", reference: "Control protegido", guardian: "RAME Guardian", conflict: "Conflicto esperado", success: "Confirmado", proof: "Prueba", recovery: "Esfuerzo de recuperación",
+    proposedImpact: "Impacto propuesto", committedImpact: "Resultado verificado tras confirmar", rejectedImpact: "Resultado verificado tras el rechazo obsoleto", proposedChanges: "Contenido que Guardian actualizará", committedChanges: "Contenido que Guardian actualizó", rejectedChanges: "No se modificó ningún trabajo", preservedCommitments: "Trabajo humano y resultados válidos intactos", noWrites: "0 de 4 resultados cambiados · 0 escrituras parciales", noWritesDetail: "El borrador obsoleto de 6 horas se rechazó antes de ejecutarse. Todos los resultados conservan su versión original.", blockedDetail: "Los cambios de 6 horas del plan, la propuesta y las tareas no se aplicaron.", userApproved: "EDICIÓN APROBADA", requiredCondition: "CONDICIÓN OBLIGATORIA", completedWork: "TRABAJO COMPLETADO", independentResult: "RESULTADO INDEPENDIENTE", unchanged: "Sin cambios", decisionSnapshot: "Instantánea exacta de la decisión",
   },
 };
 
@@ -31,6 +34,8 @@ export default function RecoveryPanel({ language, onAuthorityChanged }: { langua
   const latest = state?.drafts[0] ?? null;
   const oldDraft = useMemo(() => state?.drafts.find((draft) => draft.targetHours === 6) ?? null, [state]);
   const currentDraft = useMemo(() => state?.drafts.find((draft) => draft.targetHours === 8 && draft.status !== "stale") ?? null, [state]);
+  const resultById = useMemo(() => new Map((state?.results ?? []).map((result) => [result.id, result])), [state]);
+  const staleVersionsUnchanged = latest?.status === "stale" && state?.results.every((result) => latest.baseVersions[result.id] === result.version);
 
   async function load() {
     const response = await fetch("/api/recovery");
@@ -130,8 +135,17 @@ export default function RecoveryPanel({ language, onAuthorityChanged }: { langua
         <section className="recovery-section repair-review">
           <header><div><p>APPROVAL ENVELOPE</p><h3>{t.repair}</h3></div>{latest && <span className={`draft-status ${latest.status}`}>{latest.status} · {latest.targetHours}h</span>}</header>
           {latest ? <div className="repair-content">
+            <div className={`impact-proof ${latest.status}`}>
+              <div className="impact-proof-heading"><span>{latest.status === "stale" ? t.rejectedImpact : latest.status === "applied" ? t.committedImpact : t.proposedImpact}</span><strong>{t.decisionSnapshot} · v{latest.targetDecisionVersion}</strong></div>
+              {staleVersionsUnchanged && <div className="zero-write-proof"><ShieldCheck size={25} /><div><strong>{t.noWrites}</strong><p>{t.noWritesDetail}</p></div></div>}
+              <div className="impact-proof-grid">
+                <section className="changed-proof"><header><RefreshCw size={17} /><div><small>{t.changed}</small><h4>{latest.status === "stale" ? t.rejectedChanges : latest.status === "applied" ? t.committedChanges : t.proposedChanges}</h4></div></header>
+                  {latest.status === "stale" ? <div className="blocked-change"><AlertTriangle size={18} /><span>{t.blockedDetail}</span></div> : latest.operations.map((operation) => <OperationDiff key={operation.resultId} operation={operation} result={resultById.get(operation.resultId)} language={language} />)}
+                </section>
+                <section className="preserved-proof"><header><ShieldCheck size={17} /><div><small>{t.preserved}</small><h4>{t.preservedCommitments}</h4></div></header><PreservedCommitments draft={latest} results={state?.results ?? []} language={language} labels={t} /></section>
+              </div>
+            </div>
             <div className="model-verdict"><Sparkles size={18} /><div><small>{t.model} · {latest.model.model.split("/").pop()}</small><strong>{latest.model.recommendation.summary}</strong><p>{latest.model.recommendation.rationale}</p></div></div>
-            <div className="impact-columns"><div><h4>{t.changed}</h4>{latest.impact.changed.map((item) => <p key={item.resultId}><RefreshCw size={13} />{state?.results.find((result) => result.id === item.resultId)?.title ?? item.resultId}: {item.reason}</p>)}</div><div><h4>{t.preserved}</h4>{[...latest.impact.preserved, ...latest.impact.protectedFields].map((item) => <p key={item}><Check size={13} />{item}</p>)}</div></div>
             <footer><code>decision v{latest.targetDecisionVersion} · {Object.keys(latest.baseVersions).length} exact result versions · {latest.impact.atomicWrites} atomic writes</code>{latest.approvalHash && <code>approval {latest.approvalHash.slice(0, 18)}…</code>}<CopyMini id="draft" copied={copied} label={t} onClick={() => void copy(latest, "draft")} /></footer>
           </div> : <div className="recovery-empty">{t.noDraft}</div>}
         </section>
@@ -157,4 +171,57 @@ async function api(path: string, body: unknown) {
 
 function CopyMini({ id, copied, label, onClick }: { id: string; copied: string | null; label: { copy: string; copied: string }; onClick: () => void }) {
   return <button className="recovery-copy" onClick={onClick} title={label.copy}><ClipboardCopy size={13} />{copied === id ? label.copied : label.copy}</button>;
+}
+
+type ImpactLabels = typeof words.en;
+type FieldDiff = { label: string; before: unknown; after: unknown };
+
+function OperationDiff({ operation, result, language }: { operation: RepairOperation; result?: WorkResult; language: Language }) {
+  const diffs = meaningfulDiffs(result?.kind, operation.beforeContent ?? result?.content ?? {}, operation.nextContent, language);
+  return <article className="operation-diff"><div className="operation-title"><strong>{result?.title ?? operation.resultId}</strong><span>{operation.reason}</span></div>{diffs.map((diff) => <div className="field-diff" key={diff.label}><small>{diff.label}</small><div><code>{displayValue(diff.before)}</code><ArrowRight size={13} /><code>{displayValue(diff.after)}</code></div></div>)}</article>;
+}
+
+function PreservedCommitments({ draft, results, language, labels }: { draft: Draft; results: WorkResult[]; language: Language; labels: ImpactLabels }) {
+  const operationFor = (kind: string) => draft.operations.find((operation) => results.find((result) => result.id === operation.resultId)?.kind === kind);
+  const proposal = operationFor("proposal");
+  const board = operationFor("task_board");
+  const reference = results.find((result) => result.kind === "reference");
+  const audit = taskById(board?.nextContent ?? board?.beforeContent, "task-audit");
+  const cards = [
+    { badge: labels.userApproved, title: language === "es" ? "Precio aprobado" : "Approved price", value: proposal?.nextContent.price ?? proposal?.beforeContent?.price ?? "€2,600" },
+    { badge: labels.requiredCondition, title: language === "es" ? "Accesibilidad" : "Accessibility", value: proposal?.nextContent.accessibility ?? proposal?.beforeContent?.accessibility ?? "WCAG AAA checkout" },
+    { badge: labels.completedWork, title: language === "es" ? "Auditoría de arquitectura" : "Architecture audit", value: audit ? `${String(audit.title)} · ${String(audit.status)}` : "Architecture audit · done" },
+    { badge: labels.independentResult, title: reference?.title ?? "Independent research note", value: reference ? `${String(reference.content.status)} · ${String(reference.content.conclusion)}` : "reviewed · No availability dependency" },
+  ];
+  return <div className="commitment-list">{cards.map((card) => <article key={card.badge}><span>{card.badge}</span><strong>{card.title}</strong><div><code>{displayValue(card.value)}</code><em><Check size={11} />{labels.unchanged}</em></div></article>)}</div>;
+}
+
+function meaningfulDiffs(kind: string | undefined, before: Record<string, unknown>, after: Record<string, unknown>, language: Language): FieldDiff[] {
+  const label = (en: string, es: string) => language === "es" ? es : en;
+  if (kind === "plan") return [
+    { label: label("Available work", "Trabajo disponible"), before: before.availableHours, after: after.availableHours },
+    { label: label("Time allocation", "Distribución del tiempo"), before: before.allocation, after: after.allocation },
+    { label: label("Delivery mode", "Modo de entrega"), before: before.deliveryMode, after: after.deliveryMode },
+  ];
+  if (kind === "proposal") return [{ label: label("Delivery commitment", "Compromiso de entrega"), before: before.deliveryNote, after: after.deliveryNote }];
+  if (kind === "task_board") {
+    const oldTask = taskById(before, "task-training");
+    const newTask = taskById(after, "task-training");
+    return [
+      { label: label("Team training", "Formación del equipo"), before: oldTask?.status, after: newTask?.status },
+      { label: label("Critical path", "Ruta crítica"), before: label("Included", "Incluida"), after: newTask?.note },
+    ];
+  }
+  return [];
+}
+
+function taskById(content: Record<string, unknown> | undefined, id: string) {
+  const tasks = content && Array.isArray(content.tasks) ? content.tasks : [];
+  return tasks.find((task) => task && typeof task === "object" && (task as Record<string, unknown>).id === id) as Record<string, unknown> | undefined;
+}
+
+function displayValue(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).join(" / ");
+  if (value === undefined || value === null || value === "") return "—";
+  return String(value);
 }
