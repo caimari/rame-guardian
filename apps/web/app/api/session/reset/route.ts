@@ -11,9 +11,10 @@ export async function POST(request: Request) {
   const userId = await requestUserId(request);
   if (!userId) return NextResponse.json({ error: "A valid demo session is required." }, { status: 401 });
   try {
+    const rateLimitPrefix = `session:${userId}:`;
     await env.DB.batch([
       ...TABLES.map((table) => env.DB.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId)),
-      env.DB.prepare("DELETE FROM demo_rate_limits WHERE bucket_key LIKE ?").bind(`session:${userId}:%`),
+      env.DB.prepare("DELETE FROM demo_rate_limits WHERE substr(bucket_key,1,?)=?").bind(rateLimitPrefix.length, rateLimitPrefix),
     ]);
     return NextResponse.json({ reset: true });
   } catch (error) {

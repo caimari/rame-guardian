@@ -26,7 +26,7 @@ const copy = {
     unsafe: "Try hostile 08:00 action", safe: "Execute safe 10:30 action", stale: "Replay old plan after update", actions: "Protected execution",
     audit: "Evidence trail", receipts: "Signed receipts", calendar: "Committed effects", empty: "Run the flow to generate evidence.",
     verified: "Ed25519 verified", model: "NVIDIA Nemotron on Nebius", loading: "Working…", copied: "Copied", copy: "Copy",
-    conversation: "Conversation", conversationHint: "Chat, plan, and propose memory", lab: "Guardian Lab", labHint: "Test authority under attack", recovery: "Recovery Studio", recoveryHint: "Repair stale work without losing intent", resetDemo: "Reset demo", sessionError: "The isolated demo session could not be started.",
+    conversation: "Conversation", conversationHint: "Chat, plan, and propose memory", lab: "Guardian Lab", labHint: "Test authority under attack", recovery: "Recovery Studio", recoveryHint: "Repair stale work without losing intent", resetDemo: "Reset demo", resetting: "Resetting…", sessionError: "The isolated demo session could not be started.",
   },
   es: {
     private: "Demo pública · sesión aislada", strap: "IA PERSONAL · AUTORIDAD ANTES QUE AUTONOMÍA", title: "Agentes útiles. Decisiones tuyas.",
@@ -38,7 +38,7 @@ const copy = {
     unsafe: "Probar acción hostil a las 08:00", safe: "Ejecutar acción segura a las 10:30", stale: "Repetir plan antiguo tras actualizar", actions: "Ejecución protegida",
     audit: "Rastro de evidencias", receipts: "Recibos firmados", calendar: "Efectos confirmados", empty: "Ejecuta el flujo para generar evidencias.",
     verified: "Ed25519 verificado", model: "NVIDIA Nemotron en Nebius", loading: "Procesando…", copied: "Copiado", copy: "Copiar",
-    conversation: "Conversación", conversationHint: "Conversa, planifica y propón memoria", lab: "Guardian Lab", labHint: "Prueba la autoridad bajo ataque", recovery: "Estudio de recuperación", recoveryHint: "Repara trabajo obsoleto sin perder intención", resetDemo: "Reiniciar demo", sessionError: "No se pudo iniciar la sesión aislada de demostración.",
+    conversation: "Conversación", conversationHint: "Conversa, planifica y propón memoria", lab: "Guardian Lab", labHint: "Prueba la autoridad bajo ataque", recovery: "Estudio de recuperación", recoveryHint: "Repara trabajo obsoleto sin perder intención", resetDemo: "Reiniciar demo", resetting: "Reiniciando…", sessionError: "No se pudo iniciar la sesión aislada de demostración.",
   },
 };
 
@@ -54,6 +54,7 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
   const [error, setError] = useState<string | null>(null);
   const [receiptVerified, setReceiptVerified] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [resetVersion, setResetVersion] = useState(0);
   const t = copy[language];
   const decision = useMemo(() => state.decisions.find((item) => item.key === "calendar.not_before"), [state.decisions]);
   const initials = displayName.split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "AC";
@@ -86,7 +87,15 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
       const response = await fetch("/api/session/reset", { method: "POST", credentials: "same-origin" });
       if (!response.ok) throw new Error("Demo reset failed.");
       for (const key of Object.keys(window.localStorage)) if (key.startsWith("rame-repair-request:")) window.localStorage.removeItem(key);
-      window.location.reload();
+      setState({ decisions: [], receipts: [], events: [], calendarBlocks: [] });
+      setDocument(ATTACK_DOCUMENT);
+      setInspection(null);
+      setResult(null);
+      setReceiptVerified(false);
+      setActiveTab("recovery");
+      setResetVersion((current) => current + 1);
+      setBusy(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Demo reset failed.");
       setBusy(null);
@@ -147,7 +156,7 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
     <header className="guardian-topbar">
       <a className="guardian-brand" href="#top"><span><ShieldCheck size={20} /></span>RAME <strong>Guardian</strong></a>
       <div className="guardian-live"><i /> {t.private}</div>
-      <nav><button disabled={!!busy} onClick={() => void resetDemo()}><RotateCcw size={15} /> {t.resetDemo}</button><button onClick={() => setLanguage(language === "en" ? "es" : "en")}><Languages size={15} /> {language === "en" ? "ES" : "EN"}</button><a href="https://github.com/caimari/rame-guardian" target="_blank" rel="noreferrer"><GitFork size={15} /> GitHub</a><span className="guardian-avatar">{initials}</span></nav>
+      <nav><button disabled={!!busy} onClick={() => void resetDemo()}>{busy === "reset" ? <Loader2 className="spin" size={15} /> : <RotateCcw size={15} />} {busy === "reset" ? t.resetting : t.resetDemo}</button><button onClick={() => setLanguage(language === "en" ? "es" : "en")}><Languages size={15} /> {language === "en" ? "ES" : "EN"}</button><a href="https://github.com/caimari/rame-guardian" target="_blank" rel="noreferrer"><GitFork size={15} /> GitHub</a><span className="guardian-avatar">{initials}</span></nav>
     </header>
 
     <section className="guardian-hero" id="top">
@@ -165,9 +174,10 @@ export default function GuardianApp({ displayName }: { displayName: string }) {
       {[t.observe, t.propose, t.authorize, t.execute, t.evidence].map((label, index) => <div key={label}><span>0{index + 1}</span><strong>{label}</strong>{index < 4 && <ChevronRight size={15} />}</div>)}
     </div>}
 
-    {activeTab === "recovery" && <RecoveryPanel language={language} onAuthorityChanged={loadState} />}
+    {error && activeTab !== "lab" && <div className="guardian-error guardian-global-error"><AlertTriangle size={16} />{error}</div>}
+    {activeTab === "recovery" && <RecoveryPanel key={`recovery-${resetVersion}`} language={language} onAuthorityChanged={loadState} />}
     <div className={activeTab === "recovery" ? "guardian-grid workspace-hidden" : "guardian-grid"}>
-      <div className={activeTab === "conversation" ? "workspace-view" : "workspace-view workspace-hidden"}><ConversationPanel language={language} displayName={displayName} authorizedStatements={state.decisions.map((item) => item.statement)} onAuthorized={async (verified) => { setReceiptVerified(verified); await loadState(); }} /></div>
+      <div className={activeTab === "conversation" ? "workspace-view" : "workspace-view workspace-hidden"}><ConversationPanel key={`conversation-${resetVersion}`} language={language} displayName={displayName} authorizedStatements={state.decisions.map((item) => item.statement)} onAuthorized={async (verified) => { setReceiptVerified(verified); await loadState(); }} /></div>
       <section className={activeTab === "lab" ? "guardian-main workspace-view" : "guardian-main workspace-view workspace-hidden"}>
         <article className="guardian-card policy-card">
           <header><div className="guardian-icon"><LockKeyhole size={18} /></div><div><p>01 · AUTHORITY</p><h2>{t.policy}</h2></div><span className={`guardian-status ${decision ? "ok" : ""}`}>{decision ? `v${decision.version} · ${decision.value.time}` : "NOT SET"}</span></header>
