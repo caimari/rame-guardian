@@ -116,7 +116,7 @@ export default function RecoveryPanel({ language, onAuthorityChanged }: { langua
   return <section className="recovery-workspace">
     <header className="recovery-intro">
       <div><p>{t.eyebrow}</p><h2>{t.title}</h2><span>{t.intro}</span></div>
-      <div className="recovery-authority"><KeyRound size={18} /><span><small>{t.authority}</small><strong>{state?.decision ? `${state.decision.value.hours}h · v${state.decision.version}` : t.none}</strong></span></div>
+      <div className="recovery-authority" aria-label={`${t.authority}: ${state?.decision ? `${state.decision.value.hours}h, version ${state.decision.version}` : t.none}`}><KeyRound size={18} /><div><small>{t.authority}</small><strong>{state?.decision ? `${state.decision.value.hours}h · v${state.decision.version}` : t.none}</strong></div></div>
     </header>
 
     <div className={`recovery-guide ${currentStep === 9 ? "complete" : ""}`}><span>{currentStep === 9 ? "8 / 8" : `${currentStep} / 8`}</span><div><strong>{currentStep === 9 ? t.scenarioComplete : `${t.nextStep}: ${stepLabels[currentStep - 1]}`}</strong><p>{currentStep === 9 ? t.reviewResult : t.clickHighlighted}</p></div></div>
